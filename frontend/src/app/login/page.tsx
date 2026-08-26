@@ -55,13 +55,11 @@ export default function LoginPage() {
           {/* Logo */}
           <div className="flex flex-col items-center mb-8">
             <div
-              className="w-16 h-16 rounded-2xl mb-5 flex items-center justify-center overflow-hidden bg-white shadow-xl"
+              className="w-full h-28 rounded-2xl flex items-center justify-center overflow-hidden bg-white shadow-xl p-3"
               style={{ border: "1px solid rgba(255,255,255,0.12)" }}
             >
-              <img src="/logo.png" alt="Novo Tempo" className="w-full h-full object-cover" />
+              <img src="/logo-novo-tempo.svg" alt="Novo Tempo Corretora de Grãos" className="w-full h-full object-contain" />
             </div>
-            <h1 className="text-xl font-bold text-white tracking-tight">Novo Tempo</h1>
-            <p className="text-white/35 text-sm mt-1 font-medium">Corretora de Grãos</p>
           </div>
 
 
