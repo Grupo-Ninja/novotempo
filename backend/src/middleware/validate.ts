@@ -23,12 +23,16 @@ export const carregamentoSchema = z.object({
   corretor:     z.string().optional().nullable(),
   motorista:    z.string().optional().nullable(),
   produto:      z.string().optional().nullable(),
-  pesoKg:       z.coerce.number().min(0).default(0),
-  qntSacas:     z.coerce.number().min(0).default(0),
-  valorCarga:   z.coerce.number().min(0).default(0),
-  refPeso:      z.coerce.number().min(0).default(0),
-  refValorSaca: z.coerce.number().min(0).default(0),
-  umidadeSorgo: z.coerce.number().optional().nullable(),
+  pesoKg:       z.coerce.number().min(0, "Peso não pode ser negativo").default(0),
+  qntSacas:     z.coerce.number().min(0, "Quantidade de sacas não pode ser negativa").default(0),
+  valorCarga:   z.coerce.number().min(0, "Valor da carga não pode ser negativo").default(0),
+  refPeso:      z.coerce.number().min(0, "Referência de peso não pode ser negativa").default(0),
+  refValorSaca: z.coerce.number().min(0, "Referência do valor da saca não pode ser negativa").default(0),
+  umidadeSorgo: z.coerce.number()
+    .min(0, "Umidade não pode ser negativa")
+    .max(100, "Umidade deve estar entre 0 e 100%")
+    .optional()
+    .nullable(),
   dataEnvio:    z.string().optional().nullable(),
   observacoes:  z.string().optional().nullable(),
 });
@@ -90,9 +94,9 @@ export const transacaoSchema = z.object({
   nfAcesso:        z.string().optional().nullable(),
   status:          z.enum(["pendente", "pago", "cancelado"]).default("pendente"),
   tipoDaNota:      z.string().optional().nullable(),
-  valorDebitado:   z.coerce.number().min(0).default(0),
-  refProdutor:     z.coerce.number().min(0).default(0),
-  refComissao:     z.coerce.number().min(0).default(0),
+  valorDebitado:   z.coerce.number().min(0, "Valor debitado não pode ser negativo").default(0),
+  refProdutor:     z.coerce.number().min(0, "Referência do produtor não pode ser negativa").default(0),
+  refComissao:     z.coerce.number().min(0, "Referência da comissão não pode ser negativa").default(0),
   observacoes:     z.string().optional().nullable(),
   dataTransacao:   z.string().optional().nullable(),
 });

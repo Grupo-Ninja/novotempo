@@ -14,18 +14,27 @@ export function MoneyInput({ value, onChange, ...props }: MoneyInputProps) {
   const displayValue = formatMoney(value);
 
   function formatMoney(val: string | number) {
-    const n = typeof val === "number" ? val : parseFloat(val || "0");
+    if (val === "-") return "-";
+    const n = typeof val === "number" ? val : Number(val || "0");
+    if (!Number.isFinite(n)) return String(val);
     return n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const negative = e.target.value.includes("-");
+    if (negative) {
+      e.target.setCustomValidity("O valor não pode ser negativo.");
+      e.target.reportValidity();
+    } else {
+      e.target.setCustomValidity("");
+    }
     const cleanValue = e.target.value.replace(/\D/g, "");
     if (!cleanValue) {
-      onChange("0");
+      onChange(negative ? "-" : "0");
       return;
     }
     const floatValue = (parseInt(cleanValue, 10) / 100).toString();
-    onChange(floatValue);
+    onChange(negative ? `-${floatValue}` : floatValue);
   }
 
   return (

@@ -1,11 +1,12 @@
 "use client";
 import DashboardLayout from "../../dashboard-layout";
 import { ContratoStatusBadge, TransacaoStatusBadge } from "@/components/StatusBadge";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { formatCurrency, formatNumber, formatDate, calcContrato } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
+import { MoneyInput } from "@/components/InputMask";
 
 const PRODUTOS = ["Soja", "Milho", "Sorgo", "Trigo", "Feijão", "Algodão", "Café", "Outro"];
 
@@ -104,6 +105,34 @@ function ToggleButtons({ options, value, onChange }: {
   );
 }
 
+function parseNonNegativeDecimal(value: string | undefined, label: string, max?: number): number {
+  const raw = (value || "").trim();
+  if (!raw) return 0;
+  if (raw.startsWith("-")) {
+    throw new Error(`${label}: valores negativos não são permitidos.`);
+  }
+  if (!/^\d+(?:[.,]\d+)?$/.test(raw)) {
+    throw new Error(`${label}: informe um número válido.`);
+  }
+  const parsed = Number(raw.replace(",", "."));
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(`${label}: valores negativos não são permitidos.`);
+  }
+  if (max !== undefined && parsed > max) {
+    throw new Error(`${label} deve estar entre 0 e ${max}.`);
+  }
+  return parsed;
+}
+
+async function responseError(res: Response, fallback: string): Promise<Error> {
+  const body = await res.json().catch(() => null) as {
+    error?: string;
+    details?: { message?: string }[];
+  } | null;
+  const detail = body?.details?.map((item) => item.message).filter(Boolean).join(" · ");
+  return new Error(detail || body?.error || `${fallback} (HTTP ${res.status})`);
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ContratoDetailPage() {
@@ -127,6 +156,7 @@ export default function ContratoDetailPage() {
   const [carrForm, setCarrForm] = useState<Record<string, string>>({});
   const [trxForm, setTrxForm] = useState<Record<string, string>>({});
   const [modalLoading, setModalLoading] = useState(false);
+  const modalSubmittingRef = useRef(false);
   const [modalError, setModalError] = useState("");
   const [confirmingPago, setConfirmingPago] = useState<string | null>(null);
 
@@ -137,6 +167,7 @@ export default function ContratoDetailPage() {
 
   async function load() {
     const res = await apiFetch(`/contratos/${id}`);
+    if (!res.ok) throw await responseError(res, "Erro ao atualizar contrato");
     const data = await res.json();
     setContrato(data);
     setLoading(false);
@@ -276,21 +307,37 @@ export default function ContratoDetailPage() {
   }
 
   async function saveCarr() {
+    if (modalSubmittingRef.current) return;
+    modalSubmittingRef.current = true;
     setModalLoading(true);
     setModalError("");
     try {
+      const payload = {
+        ...carrForm,
+        contratoId: id,
+        qntSacas: parseNonNegativeDecimal(carrForm.qntSacas, "Qnt Sacas"),
+        pesoKg: parseNonNegativeDecimal(carrForm.pesoKg, "Peso"),
+        valorCarga: parseNonNegativeDecimal(carrForm.valorCarga, "Valor Carga"),
+        refPeso: parseNonNegativeDecimal(carrForm.refPeso, "Ref. Peso"),
+        refValorSaca: parseNonNegativeDecimal(carrForm.refValorSaca, "Ref. Valor Saca"),
+        umidadeSorgo: carrForm.umidadeSorgo
+          ? parseNonNegativeDecimal(carrForm.umidadeSorgo, "Umidade", 100)
+          : null,
+      };
       const url = editingCarr ? `/carregamentos/${editingCarr.id}` : "/carregamentos";
       const res = await apiFetch(url, {
         method: editingCarr ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...carrForm, contratoId: id }),
+        body: JSON.stringify(payload),
       });
-      const d = await res.json();
-      if (res.ok) { setShowCarrModal(false); load(); }
-      else setModalError(d.error || "Erro ao salvar carregamento");
-    } catch {
-      setModalError("Erro de conexão. Tente novamente.");
+      if (!res.ok) throw await responseError(res, "Erro ao salvar carregamento");
+      await load();
+      setShowCarrModal(false);
+    } catch (error) {
+      console.error("[Carregamento] Falha ao salvar", error);
+      setModalError(error instanceof Error ? error.message : "Erro de conexão. Tente novamente.");
     } finally {
+      modalSubmittingRef.current = false;
       setModalLoading(false);
     }
   }
@@ -316,21 +363,32 @@ export default function ContratoDetailPage() {
   }
 
   async function saveTrx() {
+    if (modalSubmittingRef.current) return;
+    modalSubmittingRef.current = true;
     setModalLoading(true);
     setModalError("");
     try {
+      const payload = {
+        ...trxForm,
+        contratoId: id,
+        valorDebitado: parseNonNegativeDecimal(trxForm.valorDebitado, "Valor Debitado"),
+        refComissao: parseNonNegativeDecimal(trxForm.refComissao, "Ref. Comissão"),
+        refProdutor: parseNonNegativeDecimal(trxForm.refProdutor, "Ref. Produtor"),
+      };
       const url = editingTrx ? `/transacoes/${editingTrx.id}` : "/transacoes";
       const res = await apiFetch(url, {
         method: editingTrx ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...trxForm, contratoId: id }),
+        body: JSON.stringify(payload),
       });
-      const d = await res.json();
-      if (res.ok) { setShowTrxModal(false); load(); }
-      else setModalError(d.error || "Erro ao salvar transação");
-    } catch {
-      setModalError("Erro de conexão. Tente novamente.");
+      if (!res.ok) throw await responseError(res, "Erro ao salvar transação");
+      await load();
+      setShowTrxModal(false);
+    } catch (error) {
+      console.error("[Transação] Falha ao salvar", error);
+      setModalError(error instanceof Error ? error.message : "Erro de conexão. Tente novamente.");
     } finally {
+      modalSubmittingRef.current = false;
       setModalLoading(false);
     }
   }
@@ -775,7 +833,7 @@ export default function ContratoDetailPage() {
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="p-5 border-b border-gray-100 flex items-center justify-between">
               <h3 className="font-semibold">{editingCarr ? "Editar" : "Novo"} Carregamento</h3>
-              <button onClick={() => setShowCarrModal(false)}>
+              <button onClick={() => setShowCarrModal(false)} disabled={modalLoading}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -831,17 +889,22 @@ export default function ContratoDetailPage() {
                 <input className="input" value={carrForm.corretor || ""} onChange={(e) => setCarrForm((f) => ({ ...f, corretor: e.target.value }))} />
               </div>
               {[
-                { label: "Qnt Sacas", key: "qntSacas" },
-                { label: "Peso (kg)", key: "pesoKg" },
-                { label: "Valor Carga (R$)", key: "valorCarga" },
-                { label: "Ref. Peso", key: "refPeso" },
-                { label: "Ref. Valor Saca", key: "refValorSaca" },
-                { label: "Umidade (%)", key: "umidadeSorgo" },
-              ].map(({ label, key }) => (
+                { label: "Qnt Sacas", key: "qntSacas", money: false },
+                { label: "Peso (kg)", key: "pesoKg", money: false },
+                { label: "Valor Carga (R$)", key: "valorCarga", money: true },
+                { label: "Ref. Peso", key: "refPeso", money: false },
+                { label: "Ref. Valor Saca", key: "refValorSaca", money: true },
+                { label: "Umidade (%)", key: "umidadeSorgo", money: false },
+              ].map(({ label, key, money }) => (
                 <div key={key}>
                   <label className="label">{label}</label>
-                  <input className="input" type="number" step="0.01"
-                    value={carrForm[key] || ""} onChange={(e) => setCarrForm((f) => ({ ...f, [key]: e.target.value }))} />
+                  {money ? (
+                    <MoneyInput className="input" inputMode="decimal"
+                      value={carrForm[key] || ""} onChange={(value) => setCarrForm((f) => ({ ...f, [key]: value }))} />
+                  ) : (
+                    <input className="input" type="text" inputMode="decimal"
+                      value={carrForm[key] || ""} onChange={(e) => setCarrForm((f) => ({ ...f, [key]: e.target.value }))} />
+                  )}
                 </div>
               ))}
               <div className="col-span-2">
@@ -852,7 +915,7 @@ export default function ContratoDetailPage() {
             {modalError && <div className="mx-5 mb-2 bg-red-50 text-red-700 text-sm px-3 py-2 rounded-lg">{modalError}</div>}
             <div className="p-5 border-t border-gray-100 flex gap-3">
               <button onClick={saveCarr} disabled={modalLoading} className="btn-primary flex-1 justify-center">{modalLoading ? "Salvando..." : "Salvar"}</button>
-              <button onClick={() => setShowCarrModal(false)} className="btn-secondary">Cancelar</button>
+              <button onClick={() => setShowCarrModal(false)} disabled={modalLoading} className="btn-secondary">Cancelar</button>
             </div>
           </div>
         </div>
@@ -864,7 +927,7 @@ export default function ContratoDetailPage() {
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="p-5 border-b border-gray-100 flex items-center justify-between">
               <h3 className="font-semibold">{editingTrx ? "Editar" : "Nova"} Transação</h3>
-              <button onClick={() => setShowTrxModal(false)}>
+              <button onClick={() => setShowTrxModal(false)} disabled={modalLoading}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -884,9 +947,9 @@ export default function ContratoDetailPage() {
                   <option value="cancelado">Cancelado</option>
                 </select>
               </div>
-              <div><label className="label">Valor Debitado (R$)</label><input className="input" type="number" step="0.01" value={trxForm.valorDebitado || ""} onChange={(e) => setTrxForm((f) => ({ ...f, valorDebitado: e.target.value }))} /></div>
-              <div><label className="label">Ref. Comissão (R$)</label><input className="input" type="number" step="0.01" value={trxForm.refComissao || ""} onChange={(e) => setTrxForm((f) => ({ ...f, refComissao: e.target.value }))} /></div>
-              <div><label className="label">Ref. Produtor (R$)</label><input className="input" type="number" step="0.01" value={trxForm.refProdutor || ""} onChange={(e) => setTrxForm((f) => ({ ...f, refProdutor: e.target.value }))} /></div>
+              <div><label className="label">Valor Debitado (R$)</label><MoneyInput className="input" inputMode="decimal" value={trxForm.valorDebitado || ""} onChange={(value) => setTrxForm((f) => ({ ...f, valorDebitado: value }))} /></div>
+              <div><label className="label">Ref. Comissão (R$)</label><MoneyInput className="input" inputMode="decimal" value={trxForm.refComissao || ""} onChange={(value) => setTrxForm((f) => ({ ...f, refComissao: value }))} /></div>
+              <div><label className="label">Ref. Produtor (R$)</label><MoneyInput className="input" inputMode="decimal" value={trxForm.refProdutor || ""} onChange={(value) => setTrxForm((f) => ({ ...f, refProdutor: value }))} /></div>
               <div><label className="label">Tipo da Nota</label><input className="input" value={trxForm.tipoDaNota || ""} onChange={(e) => setTrxForm((f) => ({ ...f, tipoDaNota: e.target.value }))} /></div>
               <div><label className="label">NF Balança</label><input className="input" placeholder="NF de Peso de Balança" value={trxForm.nfs || ""} onChange={(e) => setTrxForm((f) => ({ ...f, nfs: e.target.value }))} /></div>
               <div><label className="label">NF Acesso</label><input className="input" placeholder="NF de Acesso" value={trxForm.nfAcesso || ""} onChange={(e) => setTrxForm((f) => ({ ...f, nfAcesso: e.target.value }))} /></div>
@@ -895,7 +958,7 @@ export default function ContratoDetailPage() {
             {modalError && <div className="mx-5 mb-2 bg-red-50 text-red-700 text-sm px-3 py-2 rounded-lg">{modalError}</div>}
             <div className="p-5 border-t border-gray-100 flex gap-3">
               <button onClick={saveTrx} disabled={modalLoading} className="btn-primary flex-1 justify-center">{modalLoading ? "Salvando..." : "Salvar"}</button>
-              <button onClick={() => setShowTrxModal(false)} className="btn-secondary">Cancelar</button>
+              <button onClick={() => setShowTrxModal(false)} disabled={modalLoading} className="btn-secondary">Cancelar</button>
             </div>
           </div>
         </div>
