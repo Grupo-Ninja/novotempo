@@ -24,7 +24,7 @@ const DEFAULT_QUALIDADE: QualidadeRow[] = [
 function defaultClausulas(foro?: string) {
   return `1. As partes declaram plena ciência e aceitação das condições estipuladas neste instrumento particular de compra e venda.
 2. O produto objeto deste contrato está livre de quaisquer ônus, penhoras ou gravames (Lei 13.606/2018).
-3. A Corretora Novo Tempo atua exclusivamente como intermediária, sem responsabilidade solidária pelas obrigações das partes.
+3. A JP Agro — Grãos e Transporte atua exclusivamente como intermediária, sem responsabilidade solidária pelas obrigações das partes.
 4. O descumprimento de qualquer cláusula implicará multa de 10% sobre o valor total do contrato, além de perdas e danos.
 5. Este contrato entra em vigor na data de sua assinatura, sendo irretratável e irrevogável.
 6. Fica eleito o foro da Comarca de ${foro || "Uberlândia - MG"} para dirimir quaisquer litígios.`;

@@ -196,13 +196,15 @@ const fmtD = (d: any) => d ? new Date(d).toLocaleDateString("pt-BR") : "-";
 
 function loadLogo(): string {
   const candidates = [
-    path.join(process.cwd(), "..", "base64_logo.txt"), // Se executado de backend/
-    path.join(process.cwd(), "base64_logo.txt"),      // Se executado da raiz
-    path.join(__dirname, "..", "..", "base64_logo.txt"), // Relativo ao arquivo compilado
+    path.join(process.cwd(), "assets", "logo-jp-agro.png"),
+    path.join(process.cwd(), "backend", "assets", "logo-jp-agro.png"),
+    path.join(__dirname, "..", "..", "assets", "logo-jp-agro.png"),
   ];
   for (const p of candidates) {
     try {
-      if (fs.existsSync(p)) return fs.readFileSync(p, "utf-8").trim();
+      if (fs.existsSync(p)) {
+        return `data:image/png;base64,${fs.readFileSync(p).toString("base64")}`;
+      }
     } catch {}
   }
   return "";
@@ -224,7 +226,7 @@ router.get("/:id/pdf", authMiddleware, async (req, res, next) => {
     if (!contrato) throw new AppError(404, "Contrato não encontrado.", "NOT_FOUND");
 
     const view = String(req.query.view || "");
-    const logoBase64 = loadLogo();
+    const logoDataUri = loadLogo();
     const calc = calcContrato(contrato);
 
     let comissaoTexto = "";
@@ -469,17 +471,17 @@ router.get("/:id/pdf", authMiddleware, async (req, res, next) => {
   <!-- Header -->
   <div class="doc-header">
     <div class="brand">
-      ${logoBase64
-        ? `<img src="data:image/jpeg;base64,${logoBase64}" alt="Logo" />`
+      ${logoDataUri
+        ? `<img src="${logoDataUri}" alt="Logo JP Agro" />`
         : `<div style="width:40pt;height:40pt;border:1pt dashed #ccc;"></div>`}
       <div class="brand-text">
-        <h1>Novo Tempo</h1>
-        <p>CORRETORA DE GRÃOS &amp; NEGÓCIOS · UBERLÂNDIA - MG</p>
+        <h1>JP Agro</h1>
+        <p>GRÃOS E TRANSPORTE</p>
       </div>
     </div>
     <div class="header-meta">
-      contato@novotempogreos.com.br<br/>
-      Intermediação de Negócios Agrícolas<br/>
+      JP Agro — Grãos e Transporte<br/>
+      Intermediação e Transporte de Grãos<br/>
       Emitido em: ${new Date().toLocaleDateString("pt-BR")}
     </div>
   </div>
@@ -560,7 +562,7 @@ router.get("/:id/pdf", authMiddleware, async (req, res, next) => {
 
   <!-- Footer -->
   <div class="doc-footer" style="margin-top: 40pt;">
-    Documento gerado em ${new Date().toLocaleString("pt-BR")} · Intermediado por Novo Tempo Corretora de Grãos · Página 1 de 2
+    Documento gerado em ${new Date().toLocaleString("pt-BR")} · Intermediado por JP Agro — Grãos e Transporte · Página 1 de 2
   </div>
 
 </div>
@@ -571,12 +573,12 @@ router.get("/:id/pdf", authMiddleware, async (req, res, next) => {
   <!-- Header (repeated) -->
   <div class="doc-header">
     <div class="brand">
-      ${logoBase64
-        ? `<img src="data:image/jpeg;base64,${logoBase64}" alt="Logo" />`
+      ${logoDataUri
+        ? `<img src="${logoDataUri}" alt="Logo JP Agro" />`
         : `<div style="width:40pt;height:40pt;border:1pt dashed #ccc;"></div>`}
       <div class="brand-text">
-        <h1>Novo Tempo</h1>
-        <p>CORRETORA DE GRÃOS &amp; NEGÓCIOS · UBERLÂNDIA - MG</p>
+        <h1>JP Agro</h1>
+        <p>GRÃOS E TRANSPORTE</p>
       </div>
     </div>
     <div class="header-meta">
@@ -591,7 +593,7 @@ router.get("/:id/pdf", authMiddleware, async (req, res, next) => {
     <b>CLÁUSULAS:</b><br/>
     <div style="white-space: pre-wrap; font-size: 9pt;">1. As partes declaram plena ciência e aceitação das condições estipuladas neste instrumento particular de compra e venda.<br/>
 2. O produto objeto deste contrato está livre de quaisquer ônus, penhoras ou gravames (Lei 13.606/2018).<br/>
-3. A Corretora Novo Tempo atua exclusivamente como intermediária, sem responsabilidade solidária pelas obrigações das partes.<br/>
+3. A JP Agro — Grãos e Transporte atua exclusivamente como intermediária, sem responsabilidade solidária pelas obrigações das partes.<br/>
 4. O descumprimento de qualquer cláusula implicará multa de 10% sobre o valor total do contrato, além de perdas e danos.<br/>
 5. Este contrato entra em vigor na data de sua assinatura, sendo irretratável e irrevogável.<br/>
 6. Fica eleito o foro da Comarca de ${(contrato.foro || "Uberlândia - MG").toUpperCase()} para dirimir quaisquer litígios.</div>
@@ -614,7 +616,7 @@ router.get("/:id/pdf", authMiddleware, async (req, res, next) => {
 
   <!-- Footer -->
   <div class="doc-footer">
-    Documento gerado em ${new Date().toLocaleString("pt-BR")} · Intermediado por Novo Tempo Corretora de Grãos · Página 2 de 2
+    Documento gerado em ${new Date().toLocaleString("pt-BR")} · Intermediado por JP Agro — Grãos e Transporte · Página 2 de 2
   </div>
 
 </div>

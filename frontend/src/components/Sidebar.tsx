@@ -80,11 +80,11 @@ export default function Sidebar() {
       <div className="px-5 pt-7 pb-6">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center flex-shrink-0 overflow-hidden border border-white/10">
-            <img src="/logo.png" alt="Novo Tempo" className="w-full h-full object-cover" />
+            <img src="/logo-jp-agro.png" alt="JP Agro" className="w-full h-full object-cover" />
           </div>
           <div>
-            <p className="text-white font-bold text-[13px] leading-none tracking-tight">Novo Tempo</p>
-            <p className="text-white/40 text-[11px] mt-0.5 font-medium">Corretora de Grãos</p>
+            <p className="text-white font-bold text-[13px] leading-none tracking-tight">JP Agro</p>
+            <p className="text-white/40 text-[11px] mt-0.5 font-medium">Grãos e Transporte</p>
           </div>
         </div>
 

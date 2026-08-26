@@ -12,7 +12,7 @@ async function main() {
     update: {},
     create: {
       email: "admin@novotempo.com",
-      name: "Administrador Novo Tempo",
+      name: "Administrador JP Agro",
       password: adminPassword,
       role: "admin",
     },
@@ -23,7 +23,7 @@ async function main() {
     update: {},
     create: {
       email: "leitura@novotempo.com",
-      name: "Leitura Novo Tempo",
+      name: "Leitura JP Agro",
       password: readonlyPassword,
       role: "readonly",
     },

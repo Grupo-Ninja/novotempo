@@ -58,7 +58,7 @@ export default function LoginPage() {
               className="w-full h-28 rounded-2xl flex items-center justify-center overflow-hidden bg-white shadow-xl p-3"
               style={{ border: "1px solid rgba(255,255,255,0.12)" }}
             >
-              <img src="/logo-novo-tempo.png" alt="Novo Tempo Corretora de Grãos" className="w-full h-full object-contain" />
+              <img src="/logo-jp-agro.png" alt="JP Agro — Grãos e Transporte" className="w-full h-full object-contain" />
             </div>
           </div>
 
@@ -153,7 +153,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-white/20 text-xs mt-6 font-medium">
-          Novo Tempo © {new Date().getFullYear()}
+          JP Agro © {new Date().getFullYear()}
         </p>
 
       </div>

@@ -18,7 +18,6 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
-      - ./base64_logo.txt:/app/base64_logo.txt:ro
       - uploads_data:/app/uploads
     networks:
       - boaterra-net

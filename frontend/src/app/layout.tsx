@@ -3,7 +3,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "Novo Tempo — Corretora de Grãos",
+  title: "JP Agro — Grãos e Transporte",
 
   description: "Sistema de gestão de contratos e carregamentos",
   manifest: "/manifest.json",

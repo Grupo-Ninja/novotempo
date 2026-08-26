@@ -2,7 +2,7 @@
 set -e
 cd "$(dirname "$0")"
 
-echo "=== Novo Tempo — Setup ==="
+echo "=== JP Agro — Setup ==="
 
 # Install dependencies
 echo "📦 Instalando dependências..."
