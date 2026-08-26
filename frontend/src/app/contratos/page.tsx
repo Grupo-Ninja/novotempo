@@ -194,7 +194,7 @@ export default function ContratosPage() {
                         <td className="table-td">{formatNumber(c.numSacas, 0)}</td>
                         <td className="table-td">{formatCurrency(c.valorSaca)}</td>
                         <td className="table-td font-medium">{formatCurrency(calc.valorContrato)}</td>
-                        <td className="table-td">{formatNumber(calc.sacasRetiradas, 0)}</td>
+                        <td className="table-td">{formatNumber(calc.sacasRetiradas, 3)}</td>
                         <td className="table-td">{formatCurrency(calc.comissaoProjetada)}</td>
                         <td className="table-td"><ContratoStatusBadge status={c.status} /></td>
                         <td className="table-td text-gray-500">{formatDate(c.dataFechamento)}</td>

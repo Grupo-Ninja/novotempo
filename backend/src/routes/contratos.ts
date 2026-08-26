@@ -252,7 +252,7 @@ router.get("/:id/pdf", authMiddleware, async (req, res, next) => {
             <td>${c.numeroId}</td>
             <td>${fmtD(c.dataEnvio)}</td>
             <td>${c.motorista || "-"}</td>
-            <td>${fmtN(c.qntSacas, 0)}</td>
+            <td>${fmtN(c.qntSacas, 3)}</td>
             <td>${fmtN(c.pesoKg, 0)} kg</td>
             <td>${fmt(c.valorCarga)}</td>
           </tr>`

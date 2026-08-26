@@ -6,6 +6,25 @@ export function generateNumeroId(prefix: string): string {
   return `${prefix}${year}${month}${random}`;
 }
 
+export const DEFAULT_PESO_SACA_KG = 60;
+
+export function calcCarregamento(
+  pesoKg: number,
+  refPeso: number,
+  refValorSaca: number,
+) {
+  const pesoPorSaca = refPeso > 0 ? refPeso : DEFAULT_PESO_SACA_KG;
+  const valorPorSaca = refValorSaca > 0 ? refValorSaca : 0;
+  const quantidadeExata = pesoKg > 0 ? pesoKg / pesoPorSaca : 0;
+
+  return {
+    refPeso: pesoPorSaca,
+    refValorSaca: valorPorSaca,
+    qntSacas: Math.round(quantidadeExata * 1000) / 1000,
+    valorCarga: Math.round(quantidadeExata * valorPorSaca * 100) / 100,
+  };
+}
+
 export function calcContrato(contrato: {
   numSacas: number;
   valorSaca: number;

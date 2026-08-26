@@ -4,7 +4,7 @@ import { ContratoStatusBadge, TransacaoStatusBadge } from "@/components/StatusBa
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { formatCurrency, formatNumber, formatDate, calcContrato } from "@/lib/utils";
+import { calcCarregamento, calcContrato, DEFAULT_PESO_SACA_KG, formatCurrency, formatNumber, formatDate } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 import { MoneyInput } from "@/components/InputMask";
 
@@ -105,16 +105,31 @@ function ToggleButtons({ options, value, onChange }: {
   );
 }
 
+function parseLocaleDecimal(value: string | undefined): number {
+  const raw = (value || "").trim();
+  if (!raw) return 0;
+
+  const normalized = raw.includes(",")
+    ? raw.replace(/\./g, "").replace(",", ".")
+    : /^\d{1,3}(?:\.\d{3})+$/.test(raw)
+      ? raw.replace(/\./g, "")
+      : raw;
+
+  return Number(normalized);
+}
+
 function parseNonNegativeDecimal(value: string | undefined, label: string, max?: number): number {
   const raw = (value || "").trim();
   if (!raw) return 0;
   if (raw.startsWith("-")) {
     throw new Error(`${label}: valores negativos não são permitidos.`);
   }
-  if (!/^\d+(?:[.,]\d+)?$/.test(raw)) {
+  const simpleNumber = /^\d+(?:[.,]\d+)?$/;
+  const brazilianGroupedNumber = /^\d{1,3}(?:\.\d{3})+(?:,\d+)?$/;
+  if (!simpleNumber.test(raw) && !brazilianGroupedNumber.test(raw)) {
     throw new Error(`${label}: informe um número válido.`);
   }
-  const parsed = Number(raw.replace(",", "."));
+  const parsed = parseLocaleDecimal(raw);
   if (!Number.isFinite(parsed) || parsed < 0) {
     throw new Error(`${label}: valores negativos não são permitidos.`);
   }
@@ -209,6 +224,25 @@ export default function ContratoDetailPage() {
     (m.placaCavalo && m.placaCavalo.toLowerCase().includes(motoristaSearch.toLowerCase()))
   );
 
+  function recalculateCarrForm(next: Record<string, string>) {
+    const pesoKg = parseLocaleDecimal(next.pesoKg) || 0;
+    const refPeso = parseLocaleDecimal(next.refPeso) || DEFAULT_PESO_SACA_KG;
+    const refValorSaca = parseLocaleDecimal(next.refValorSaca) || contrato!.valorSaca;
+    const calculado = calcCarregamento(pesoKg, refPeso, refValorSaca);
+
+    return {
+      ...next,
+      refPeso: String(calculado.refPeso),
+      refValorSaca: String(calculado.refValorSaca),
+      qntSacas: pesoKg > 0 ? String(calculado.qntSacas) : "",
+      valorCarga: pesoKg > 0 ? String(calculado.valorCarga) : "",
+    };
+  }
+
+  function setCarrCalculationField(key: "pesoKg" | "refPeso" | "refValorSaca", value: string) {
+    setCarrForm((current) => recalculateCarrForm({ ...current, [key]: value }));
+  }
+
   function startEdit() {
     setEditForm({
       status: contrato!.status, produto: contrato!.produto, cidade: contrato!.cidade || "",
@@ -290,19 +324,23 @@ export default function ContratoDetailPage() {
     const motNome = carr?.motorista || "";
     setMotoristaSearch(motNome);
     setShowMotoristaDrop(false);
-    setCarrForm(carr ? {
+    const initialForm = carr ? {
       dataEnvio: carr.dataEnvio ? carr.dataEnvio.split("T")[0] : "",
       motorista: carr.motorista || "", corretor: carr.corretor || "",
       produto: carr.produto || contrato!.produto, pesoKg: String(carr.pesoKg),
       qntSacas: String(carr.qntSacas), valorCarga: String(carr.valorCarga),
-      refPeso: String(carr.refPeso), refValorSaca: String(carr.refValorSaca),
+      refPeso: String(carr.refPeso || contrato!.refPeso || DEFAULT_PESO_SACA_KG),
+      refValorSaca: String(carr.refValorSaca || contrato!.valorSaca),
       umidadeSorgo: carr.umidadeSorgo != null ? String(carr.umidadeSorgo) : "",
       observacoes: carr.observacoes || "",
     } : {
       produto: contrato!.produto, dataEnvio: "", motorista: "", corretor: "",
-      pesoKg: "", qntSacas: "", valorCarga: "", refPeso: "", refValorSaca: "",
+      pesoKg: "", qntSacas: "", valorCarga: "",
+      refPeso: String(contrato!.refPeso || DEFAULT_PESO_SACA_KG),
+      refValorSaca: String(contrato!.valorSaca),
       umidadeSorgo: "", observacoes: "",
-    });
+    };
+    setCarrForm(recalculateCarrForm(initialForm));
     setShowCarrModal(true);
   }
 
@@ -312,11 +350,13 @@ export default function ContratoDetailPage() {
     setModalLoading(true);
     setModalError("");
     try {
+      const pesoKg = parseNonNegativeDecimal(carrForm.pesoKg, "Peso");
+      if (pesoKg <= 0) throw new Error("Peso: informe um valor maior que zero.");
       const payload = {
         ...carrForm,
         contratoId: id,
         qntSacas: parseNonNegativeDecimal(carrForm.qntSacas, "Qnt Sacas"),
-        pesoKg: parseNonNegativeDecimal(carrForm.pesoKg, "Peso"),
+        pesoKg,
         valorCarga: parseNonNegativeDecimal(carrForm.valorCarga, "Valor Carga"),
         refPeso: parseNonNegativeDecimal(carrForm.refPeso, "Ref. Peso"),
         refValorSaca: parseNonNegativeDecimal(carrForm.refValorSaca, "Ref. Valor Saca"),
@@ -697,7 +737,7 @@ export default function ContratoDetailPage() {
                         <td className="table-td text-xs text-gray-500">{c.numeroId}</td>
                         <td className="table-td">{formatDate(c.dataEnvio)}</td>
                         <td className="table-td">{c.motorista || "-"}</td>
-                        <td className="table-td">{formatNumber(c.qntSacas, 0)}</td>
+                        <td className="table-td">{formatNumber(c.qntSacas, 3)}</td>
                         <td className="table-td">{formatNumber(c.pesoKg, 0)}</td>
                         <td className="table-td">{formatCurrency(c.valorCarga)}</td>
                         <td className="table-td">{c.umidadeSorgo != null ? `${c.umidadeSorgo}%` : "-"}</td>
@@ -712,7 +752,7 @@ export default function ContratoDetailPage() {
                   </tbody>
                   <tfoot><tr className="bg-bt-pale">
                     <td colSpan={3} className="table-td font-semibold text-bt-dark">Total</td>
-                    <td className="table-td font-semibold">{formatNumber(calc.sacasRetiradas, 0)}</td>
+                    <td className="table-td font-semibold">{formatNumber(calc.sacasRetiradas, 3)}</td>
                     <td className="table-td font-semibold">{formatNumber(contrato.carregamentos.reduce((s, c) => s + c.pesoKg, 0), 0)}</td>
                     <td className="table-td font-semibold">{formatCurrency(calc.valorCarregado)}</td>
                     <td colSpan={2} />
@@ -789,8 +829,8 @@ export default function ContratoDetailPage() {
             <InfoRow label="Nº Sacas" value={formatNumber(contrato.numSacas, 0)} />
             <InfoRow label="Valor/Saca" value={formatCurrency(contrato.valorSaca)} />
             <InfoRow label="Valor Contrato" value={<span className="text-bt-dark font-bold">{formatCurrency(calc.valorContrato)}</span>} />
-            <InfoRow label="Sacas Retiradas" value={formatNumber(calc.sacasRetiradas, 0)} />
-            <InfoRow label="Sacas a Retirar" value={formatNumber(calc.sacasARetirar, 0)} />
+            <InfoRow label="Sacas Retiradas" value={formatNumber(calc.sacasRetiradas, 3)} />
+            <InfoRow label="Sacas a Retirar" value={formatNumber(calc.sacasARetirar, 3)} />
             <InfoRow label="Valor Carregado" value={formatCurrency(calc.valorCarregado)} />
             <InfoRow label="Saldo Carregamento" value={formatCurrency(calc.saldoCarregamento)} />
             <div className="border-t border-gray-100 mt-2 pt-2">
@@ -888,25 +928,44 @@ export default function ContratoDetailPage() {
                 <label className="label">Corretor</label>
                 <input className="input" value={carrForm.corretor || ""} onChange={(e) => setCarrForm((f) => ({ ...f, corretor: e.target.value }))} />
               </div>
-              {[
-                { label: "Qnt Sacas", key: "qntSacas", money: false },
-                { label: "Peso (kg)", key: "pesoKg", money: false },
-                { label: "Valor Carga (R$)", key: "valorCarga", money: true },
-                { label: "Ref. Peso", key: "refPeso", money: false },
-                { label: "Ref. Valor Saca", key: "refValorSaca", money: true },
-                { label: "Umidade (%)", key: "umidadeSorgo", money: false },
-              ].map(({ label, key, money }) => (
-                <div key={key}>
-                  <label className="label">{label}</label>
-                  {money ? (
-                    <MoneyInput className="input" inputMode="decimal"
-                      value={carrForm[key] || ""} onChange={(value) => setCarrForm((f) => ({ ...f, [key]: value }))} />
-                  ) : (
-                    <input className="input" type="text" inputMode="decimal"
-                      value={carrForm[key] || ""} onChange={(e) => setCarrForm((f) => ({ ...f, [key]: e.target.value }))} />
-                  )}
+              <div>
+                <label className="label">Peso líquido (kg)</label>
+                <input className="input" type="text" inputMode="decimal" placeholder="Ex.: 30.000" required
+                  value={carrForm.pesoKg || ""} onChange={(e) => setCarrCalculationField("pesoKg", e.target.value)} />
+                <p className="mt-1 text-[11px] text-gray-400">Digite o peso da balança.</p>
+              </div>
+              <div>
+                <label className="label">Peso por saca (kg)</label>
+                <input className="input" type="text" inputMode="decimal"
+                  value={carrForm.refPeso || ""} onChange={(e) => setCarrCalculationField("refPeso", e.target.value)} />
+                <p className="mt-1 text-[11px] text-gray-400">Padrão: 60 kg por saca.</p>
+              </div>
+              <div className="rounded-xl border border-brand-100 bg-brand-50 px-3.5 py-3">
+                <label className="block text-xs font-semibold text-brand-700 mb-1">Sacas calculadas</label>
+                <p className="text-lg font-bold text-brand-900">
+                  {formatNumber(Number(carrForm.qntSacas) || 0, 3)}
+                </p>
+              </div>
+              <div>
+                <label className="label">Valor por saca (R$)</label>
+                <MoneyInput className="input" inputMode="decimal"
+                  value={carrForm.refValorSaca || ""} onChange={(value) => setCarrCalculationField("refValorSaca", value)} />
+                <p className="mt-1 text-[11px] text-gray-400">Preenchido pelo contrato.</p>
+              </div>
+              <div className="col-span-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-center justify-between gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-amber-800">Valor da carga calculado</label>
+                  <p className="mt-1 text-[11px] text-amber-700">Peso ÷ kg/saca × valor da saca</p>
                 </div>
-              ))}
+                <p className="text-xl font-bold text-amber-900 whitespace-nowrap">
+                  {formatCurrency(Number(carrForm.valorCarga) || 0)}
+                </p>
+              </div>
+              <div>
+                <label className="label">Umidade (%)</label>
+                <input className="input" type="text" inputMode="decimal"
+                  value={carrForm.umidadeSorgo || ""} onChange={(e) => setCarrForm((f) => ({ ...f, umidadeSorgo: e.target.value }))} />
+              </div>
               <div className="col-span-2">
                 <label className="label">Observações</label>
                 <textarea className="input" rows={2} value={carrForm.observacoes || ""} onChange={(e) => setCarrForm((f) => ({ ...f, observacoes: e.target.value }))} />

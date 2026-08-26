@@ -1,13 +1,30 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { carregamentoSchema, transacaoSchema } from "./validate";
+import { calcCarregamento } from "../lib/utils";
 
 const contratoId = "contrato-1";
+
+test("calcula sacas pelo peso e o valor proporcional da carga", () => {
+  assert.deepEqual(calcCarregamento(30_000, 60, 100), {
+    refPeso: 60,
+    refValorSaca: 100,
+    qntSacas: 500,
+    valorCarga: 50_000,
+  });
+
+  assert.deepEqual(calcCarregamento(1_000, 60, 100), {
+    refPeso: 60,
+    refValorSaca: 100,
+    qntSacas: 16.667,
+    valorCarga: 1_666.67,
+  });
+});
 
 test("carregamento rejeita umidade negativa e acima de 100", () => {
   assert.equal(carregamentoSchema.safeParse({ contratoId, umidadeSorgo: -0.03 }).success, false);
   assert.equal(carregamentoSchema.safeParse({ contratoId, umidadeSorgo: 100.01 }).success, false);
-  assert.equal(carregamentoSchema.safeParse({ contratoId, umidadeSorgo: 14 }).success, true);
+  assert.equal(carregamentoSchema.safeParse({ contratoId, pesoKg: 60, umidadeSorgo: 14 }).success, true);
 });
 
 test("carregamento rejeita valores quantitativos e monetários negativos", () => {

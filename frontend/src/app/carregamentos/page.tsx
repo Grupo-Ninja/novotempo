@@ -62,7 +62,7 @@ export default function CarregamentosPage() {
       <PageHeader title="Carregamentos" subtitle={`${meta.total} registros`} />
 
       <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Total Sacas</p><p className="text-xl font-bold">{formatNumber(totalSacas, 0)}</p></div>
+        <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Total Sacas</p><p className="text-xl font-bold">{formatNumber(totalSacas, 3)}</p></div>
         <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Peso Total (kg)</p><p className="text-xl font-bold">{formatNumber(totalPeso, 0)}</p></div>
         <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Valor Total</p><p className="text-xl font-bold text-bt-dark">{formatCurrency(totalValor)}</p></div>
       </div>
@@ -117,7 +117,7 @@ export default function CarregamentosPage() {
                     <td className="table-td">{formatDate(c.dataEnvio)}</td>
                     <td className="table-td">{c.produto || "-"}</td>
                     <td className="table-td">{c.motorista || "-"}</td>
-                    <td className="table-td">{formatNumber(c.qntSacas, 0)}</td>
+                    <td className="table-td">{formatNumber(c.qntSacas, 3)}</td>
                     <td className="table-td">{formatNumber(c.pesoKg, 0)}</td>
                     <td className="table-td font-medium">{formatCurrency(c.valorCarga)}</td>
                   </tr>

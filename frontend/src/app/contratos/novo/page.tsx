@@ -67,7 +67,7 @@ export default function NovoContratoPage() {
     termino: "",
     fechamentoOrigem: "",
     fechamentoDestino: "",
-    refPeso: "",
+    refPeso: "60",
     comissaoPagaPor: "comprador",
     comissaoVendedor: "",
     comissaoComprador: "",

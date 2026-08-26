@@ -93,6 +93,7 @@ describe("modais do contrato", () => {
   it("não envia umidade negativa e mantém o carregamento preenchido aberto", async () => {
     await renderPage();
     const modal = openLoadingModal();
+    fireEvent.change(formControl(modal, "Peso líquido (kg)"), { target: { value: "60" } });
     const humidity = formControl(modal, "Umidade (%)") as HTMLInputElement;
     fireEvent.change(humidity, { target: { value: "-0.03" } });
     fireEvent.click(within(modal).getByRole("button", { name: "Salvar" }));
@@ -101,6 +102,19 @@ describe("modais do contrato", () => {
     expect(humidity.value).toBe("-0.03");
     expect(apiFetchMock.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
     expect(screen.getByRole("heading", { name: "Novo Carregamento" })).toBeTruthy();
+  });
+
+  it("calcula automaticamente sacas e valor da carga a partir do peso", async () => {
+    await renderPage();
+    const modal = openLoadingModal();
+
+    expect((formControl(modal, "Peso por saca (kg)") as HTMLInputElement).value).toBe("60");
+    expect((formControl(modal, "Valor por saca (R$)") as HTMLInputElement).value).toBe("100,00");
+
+    fireEvent.change(formControl(modal, "Peso líquido (kg)"), { target: { value: "30.000" } });
+
+    expect(within(modal).getByText("500,000")).toBeTruthy();
+    expect(within(modal).getByText((text) => /R\$\s*50\.000,00/.test(text))).toBeTruthy();
   });
 
   it("não persiste valor monetário inválido no frontend", async () => {

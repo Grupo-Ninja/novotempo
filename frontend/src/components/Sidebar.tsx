@@ -79,8 +79,8 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="px-5 pt-7 pb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center flex-shrink-0 overflow-hidden border border-white/10">
-            <img src="/logo-jp-agro.png" alt="JP Agro" className="w-full h-full object-cover" />
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-amber-400 flex items-center justify-center flex-shrink-0 shadow-lg shadow-black/20 ring-1 ring-white/15">
+            <span className="text-sm font-extrabold tracking-[-0.08em] text-white">JP</span>
           </div>
           <div>
             <p className="text-white font-bold text-[13px] leading-none tracking-tight">JP Agro</p>
