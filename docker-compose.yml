@@ -14,7 +14,7 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       CORS_ORIGINS: ${CORS_ORIGINS}
-    command: sh -c "npx prisma generate && npm run build && npm start"
+    command: sh -c "npx prisma migrate deploy && npm run db:seed && npm run build && npm start"
     volumes:
       - ./backend:/app
       - /app/node_modules

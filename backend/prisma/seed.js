@@ -9,7 +9,11 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: "admin@novotempo.com" },
-    update: {},
+    update: {
+      name: "Administrador JP Agro",
+      password: adminPassword,
+      role: "admin",
+    },
     create: {
       email: "admin@novotempo.com",
       name: "Administrador JP Agro",
@@ -20,7 +24,11 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: "leitura@novotempo.com" },
-    update: {},
+    update: {
+      name: "Leitura JP Agro",
+      password: readonlyPassword,
+      role: "readonly",
+    },
     create: {
       email: "leitura@novotempo.com",
       name: "Leitura JP Agro",

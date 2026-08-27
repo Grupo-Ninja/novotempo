@@ -20,12 +20,13 @@ export const authOptions: NextAuthOptions = {
         if (!credentials?.email || !credentials?.password) return null;
 
         try {
+          const email = credentials.email.trim().toLowerCase();
           const backendUrl = process.env.BACKEND_INTERNAL_URL || "http://localhost:3002";
-          console.log(`Tentando login para ${credentials.email} em ${backendUrl}/api/auth/login`);
+          console.log(`Tentando login para ${email} em ${backendUrl}/api/auth/login`);
           
           const res = await fetch(`${backendUrl}/api/auth/login`, {
             method: "POST",
-            body: JSON.stringify(credentials),
+            body: JSON.stringify({ email, password: credentials.password }),
             headers: { "Content-Type": "application/json" }
           });
 

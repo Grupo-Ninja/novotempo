@@ -5,7 +5,8 @@ import bcrypt from "bcryptjs";
 const router = Router();
 
 router.post("/login", async (req, res) => {
-  const { email, password } = req.body;
+  const email = typeof req.body.email === "string" ? req.body.email.trim().toLowerCase() : "";
+  const password = typeof req.body.password === "string" ? req.body.password : "";
   console.log(`Recebido pedido de login para: ${email}`);
 
   try {
