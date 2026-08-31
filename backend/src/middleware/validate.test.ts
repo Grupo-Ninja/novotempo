@@ -64,3 +64,13 @@ test("transação continua aceitando campos opcionais vazios com valores padrão
     assert.equal(result.data.refProdutor, 0);
   }
 });
+
+test("carregamento permite criar ordem sem peso informado", () => {
+  const result = carregamentoSchema.safeParse({ contratoId, motorista: "Joao Silva" });
+  assert.equal(result.success, true);
+  if (result.success) {
+    assert.equal(result.data.pesoKg, 0);
+    assert.equal(result.data.qntSacas, 0);
+    assert.equal(result.data.valorCarga, 0);
+  }
+});

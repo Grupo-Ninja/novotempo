@@ -117,9 +117,9 @@ export default function CarregamentosPage() {
                     <td className="table-td">{formatDate(c.dataEnvio)}</td>
                     <td className="table-td">{c.produto || "-"}</td>
                     <td className="table-td">{c.motorista || "-"}</td>
-                    <td className="table-td">{formatNumber(c.qntSacas, 3)}</td>
-                    <td className="table-td">{formatNumber(c.pesoKg, 0)}</td>
-                    <td className="table-td font-medium">{formatCurrency(c.valorCarga)}</td>
+                    <td className="table-td">{c.pesoKg > 0 ? formatNumber(c.qntSacas, 3) : <span className="text-amber-700 font-medium">Pendente</span>}</td>
+                    <td className="table-td">{c.pesoKg > 0 ? formatNumber(c.pesoKg, 0) : <span className="text-amber-700 font-medium">Pendente</span>}</td>
+                    <td className="table-td font-medium">{c.pesoKg > 0 ? formatCurrency(c.valorCarga) : <span className="text-amber-700 font-medium">Pendente</span>}</td>
                   </tr>
                 ))}
               </tbody>

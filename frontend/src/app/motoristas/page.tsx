@@ -57,6 +57,12 @@ export default function MotoristasPage() {
     setShowModal(true);
   }
 
+  useEffect(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("novo") === "1" && isAdmin) {
+      openNew();
+    }
+  }, [isAdmin]);
+
   function openEdit(m: Motorista) {
     setEditing(m);
     setForm({

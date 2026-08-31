@@ -193,6 +193,16 @@ router.delete("/:id", authMiddleware, adminOnly, async (req, res, next) => {
 const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtN = (n: number, d = 2) => n.toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d });
 const fmtD = (d: any) => d ? new Date(d).toLocaleDateString("pt-BR") : "-";
+const bankValue = (value?: string | null) => value?.trim() || "-";
+
+function bankRows(cliente: { banco?: string | null; agencia?: string | null; conta?: string | null; pix?: string | null }) {
+  return `
+    <div class="drow"><span class="dlabel">Banco:</span><span class="dval">${bankValue(cliente.banco)}</span></div>
+    <div class="drow"><span class="dlabel">Agencia:</span><span class="dval">${bankValue(cliente.agencia)}</span></div>
+    <div class="drow"><span class="dlabel">Conta:</span><span class="dval">${bankValue(cliente.conta)}</span></div>
+    <div class="drow"><span class="dlabel">PIX:</span><span class="dval">${bankValue(cliente.pix)}</span></div>
+  `;
+}
 
 function loadLogo(): string {
   const candidates = [
@@ -346,6 +356,12 @@ router.get("/:id/pdf", authMiddleware, async (req, res, next) => {
     .drow { display: flex; border-bottom: 0.5pt solid #ddd; padding: 2pt 0; font-size: 9pt; }
     .dlabel { width: 80pt; font-weight: bold; color: #555; flex-shrink: 0; }
     .dval { font-weight: bold; color: #111; }
+    .bank-block {
+      border: 1pt solid #d6dfd3;
+      background: #fbfdf9;
+      padding: 6pt 8pt;
+    }
+    .bank-block .sec-head { margin: -6pt -8pt 6pt; }
 
     /* ── Quality table ───────────────────────────────────────────────── */
     table.quality {
@@ -510,6 +526,18 @@ router.get("/:id/pdf", authMiddleware, async (req, res, next) => {
       <div class="drow"><span class="dlabel">Telefone:</span><span class="dval">${contrato.comprador.telefone || "-"}</span></div>
       <div class="drow"><span class="dlabel">Data Contrato:</span><span class="dval">${fmtD(contrato.dataFechamento)}</span></div>
       <div class="drow"><span class="dlabel">Vigência:</span><span class="dval">${fmtD(contrato.inicio)} a ${fmtD(contrato.termino)}</span></div>
+    </div>
+  </div>
+
+  <!-- Bank details -->
+  <div class="grid2">
+    <div class="bank-block">
+      <div class="sec-head">Dados Bancarios do Vendedor</div>
+      ${bankRows(contrato.produtor)}
+    </div>
+    <div class="bank-block">
+      <div class="sec-head">Dados Bancarios do Comprador</div>
+      ${bankRows(contrato.comprador)}
     </div>
   </div>
 

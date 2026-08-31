@@ -51,7 +51,7 @@ interface Contrato {
   comissaoPagaPor: string; comissaoVendedor: number; comissaoComprador: number;
   fretePorConta?: string; localRetirada?: string; condicoesPagamento?: string;
   funrural: number; foro?: string; padraoQualidade?: QualidadeRow[];
-  comprador: { id: string; nome: string; cpfCnpj: string; endereco?: string; };
+  comprador: { id: string; nome: string; cpfCnpj: string; endereco?: string; banco?: string; agencia?: string; conta?: string; pix?: string; };
   produtor: { id: string; nome: string; cpfCnpj: string; inscricaoEstadual?: string; fazenda?: string; banco?: string; agencia?: string; conta?: string; pix?: string; };
   carregamentos: Carregamento[];
   transacoes: Transacao[];
@@ -101,6 +101,17 @@ function ToggleButtons({ options, value, onChange }: {
           {opt.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+function BankInfo({ cliente }: { cliente: { banco?: string; agencia?: string; conta?: string; pix?: string } }) {
+  return (
+    <div className="mt-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-500">
+      <p><span className="font-semibold text-gray-600">Banco:</span> {cliente.banco || "-"}</p>
+      <p><span className="font-semibold text-gray-600">Agencia:</span> {cliente.agencia || "-"}</p>
+      <p><span className="font-semibold text-gray-600">Conta:</span> {cliente.conta || "-"}</p>
+      <p><span className="font-semibold text-gray-600">PIX:</span> {cliente.pix || "-"}</p>
     </div>
   );
 }
@@ -351,13 +362,12 @@ export default function ContratoDetailPage() {
     setModalError("");
     try {
       const pesoKg = parseNonNegativeDecimal(carrForm.pesoKg, "Peso");
-      if (pesoKg <= 0) throw new Error("Peso: informe um valor maior que zero.");
       const payload = {
         ...carrForm,
         contratoId: id,
-        qntSacas: parseNonNegativeDecimal(carrForm.qntSacas, "Qnt Sacas"),
+        qntSacas: pesoKg > 0 ? parseNonNegativeDecimal(carrForm.qntSacas, "Qnt Sacas") : 0,
         pesoKg,
-        valorCarga: parseNonNegativeDecimal(carrForm.valorCarga, "Valor Carga"),
+        valorCarga: pesoKg > 0 ? parseNonNegativeDecimal(carrForm.valorCarga, "Valor Carga") : 0,
         refPeso: parseNonNegativeDecimal(carrForm.refPeso, "Ref. Peso"),
         refValorSaca: parseNonNegativeDecimal(carrForm.refValorSaca, "Ref. Valor Saca"),
         umidadeSorgo: carrForm.umidadeSorgo
@@ -737,9 +747,9 @@ export default function ContratoDetailPage() {
                         <td className="table-td text-xs text-gray-500">{c.numeroId}</td>
                         <td className="table-td">{formatDate(c.dataEnvio)}</td>
                         <td className="table-td">{c.motorista || "-"}</td>
-                        <td className="table-td">{formatNumber(c.qntSacas, 3)}</td>
-                        <td className="table-td">{formatNumber(c.pesoKg, 0)}</td>
-                        <td className="table-td">{formatCurrency(c.valorCarga)}</td>
+                        <td className="table-td">{c.pesoKg > 0 ? formatNumber(c.qntSacas, 3) : <span className="text-amber-700 font-medium">Pendente</span>}</td>
+                        <td className="table-td">{c.pesoKg > 0 ? formatNumber(c.pesoKg, 0) : <span className="text-amber-700 font-medium">Pendente</span>}</td>
+                        <td className="table-td">{c.pesoKg > 0 ? formatCurrency(c.valorCarga) : <span className="text-amber-700 font-medium">Pendente</span>}</td>
                         <td className="table-td">{c.umidadeSorgo != null ? `${c.umidadeSorgo}%` : "-"}</td>
                         <td className="table-td">
                           <div className="flex gap-2">
@@ -856,11 +866,13 @@ export default function ContratoDetailPage() {
                 <p className="text-xs text-gray-500">Comprador</p>
                 <p className="text-sm font-medium">{contrato.comprador.nome}</p>
                 <p className="text-xs text-gray-400">{contrato.comprador.cpfCnpj}</p>
+                <BankInfo cliente={contrato.comprador} />
               </div>
               <div>
                 <p className="text-xs text-gray-500">Produtor</p>
                 <p className="text-sm font-medium">{contrato.produtor.nome}</p>
                 <p className="text-xs text-gray-400">{contrato.produtor.cpfCnpj}</p>
+                <BankInfo cliente={contrato.produtor} />
               </div>
             </div>
           </div>
@@ -889,7 +901,17 @@ export default function ContratoDetailPage() {
 
               {/* Motorista — combobox com search */}
               <div className="col-span-2 relative">
-                <label className="label">Motorista</label>
+                <div className="mb-1 flex items-center justify-between gap-3">
+                  <label className="label mb-0">Motorista</label>
+                  <a
+                    href="/motoristas?novo=1"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-semibold text-brand-700 hover:text-brand-800 hover:underline"
+                  >
+                    + Cadastrar motorista
+                  </a>
+                </div>
                 <input
                   className="input"
                   placeholder="Buscar por nome ou placa..."
@@ -930,9 +952,9 @@ export default function ContratoDetailPage() {
               </div>
               <div>
                 <label className="label">Peso líquido (kg)</label>
-                <input className="input" type="text" inputMode="decimal" placeholder="Ex.: 30.000" required
+                <input className="input" type="text" inputMode="decimal" placeholder="Ex.: 30.000"
                   value={carrForm.pesoKg || ""} onChange={(e) => setCarrCalculationField("pesoKg", e.target.value)} />
-                <p className="mt-1 text-[11px] text-gray-400">Digite o peso da balança.</p>
+                <p className="mt-1 text-[11px] text-gray-400">Pode ficar em branco para deixar a ordem pronta.</p>
               </div>
               <div>
                 <label className="label">Peso por saca (kg)</label>

@@ -36,8 +36,8 @@ function baseContract() {
     comissaoComprador: 0,
     funrural: 0,
     refPeso: 0,
-    comprador: { id: "comprador-1", nome: "Comprador", cpfCnpj: "1" },
-    produtor: { id: "produtor-1", nome: "Produtor", cpfCnpj: "2" },
+    comprador: { id: "comprador-1", nome: "Comprador", cpfCnpj: "1", banco: "Sicoob", agencia: "0001", conta: "12345-6", pix: "comprador@pix.com" },
+    produtor: { id: "produtor-1", nome: "Produtor", cpfCnpj: "2", banco: "Banco do Brasil", agencia: "2222", conta: "65432-1", pix: "produtor@pix.com" },
     carregamentos: [] as Record<string, unknown>[],
     transacoes: [] as Record<string, unknown>[],
   };
@@ -45,7 +45,8 @@ function baseContract() {
 
 function formControl(modal: HTMLElement, label: string): HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement {
   const labelNode = within(modal).getByText(label, { selector: "label" });
-  const control = labelNode.parentElement?.querySelector("input, select, textarea");
+  const control = labelNode.parentElement?.querySelector("input, select, textarea")
+    || labelNode.parentElement?.parentElement?.querySelector("input, select, textarea");
   if (!control) throw new Error(`Controle não encontrado: ${label}`);
   return control as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
 }
@@ -193,5 +194,55 @@ describe("modais do contrato", () => {
       refComissao: 10,
       refProdutor: 113.45,
     });
+  });
+
+  it("exibe os dados bancarios das partes na tela do contrato", async () => {
+    await renderPage();
+
+    expect(screen.getByText("Sicoob")).toBeTruthy();
+    expect(screen.getByText("comprador@pix.com")).toBeTruthy();
+    expect(screen.getByText("Banco do Brasil")).toBeTruthy();
+    expect(screen.getByText("produtor@pix.com")).toBeTruthy();
+  });
+
+  it("cria ordem de carregamento com motorista mesmo sem peso", async () => {
+    let payload: Record<string, unknown> = {};
+    let harness!: Awaited<ReturnType<typeof renderPage>>;
+
+    harness = await renderPage(async (path, options) => {
+      expect(path).toBe("/carregamentos");
+      payload = JSON.parse(String(options.body));
+      const created = {
+        id: "car-1",
+        numeroId: "CAR001",
+        motorista: payload.motorista,
+        produto: payload.produto,
+        pesoKg: 0,
+        qntSacas: 0,
+        valorCarga: 0,
+        refPeso: 60,
+        refValorSaca: 100,
+      };
+      harness.setContract({ ...baseContract(), carregamentos: [created] });
+      return response(created, 201);
+    });
+
+    const modal = openLoadingModal();
+    fireEvent.change(formControl(modal, "Motorista"), { target: { value: "Joao Silva" } });
+    fireEvent.click(within(modal).getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Novo Carregamento" })).toBeNull());
+    expect(payload).toMatchObject({
+      contratoId: "contrato-1",
+      motorista: "Joao Silva",
+      pesoKg: 0,
+      qntSacas: 0,
+      valorCarga: 0,
+      refPeso: 60,
+      refValorSaca: 100,
+    });
+    expect(screen.getByText("Carregamentos (1)")).toBeTruthy();
+    expect(screen.getByText("Joao Silva")).toBeTruthy();
+    expect(screen.getAllByText("Pendente").length).toBeGreaterThan(0);
   });
 });

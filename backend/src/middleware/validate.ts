@@ -23,7 +23,7 @@ export const carregamentoSchema = z.object({
   corretor:     z.string().optional().nullable(),
   motorista:    z.string().optional().nullable(),
   produto:      z.string().optional().nullable(),
-  pesoKg:       z.coerce.number().positive("Peso deve ser maior que zero"),
+  pesoKg:       z.coerce.number().min(0, "Peso nÃ£o pode ser negativo").default(0),
   qntSacas:     z.coerce.number().min(0, "Quantidade de sacas não pode ser negativa").default(0),
   valorCarga:   z.coerce.number().min(0, "Valor da carga não pode ser negativo").default(0),
   refPeso:      z.coerce.number().min(0, "Referência de peso não pode ser negativa").default(0),
