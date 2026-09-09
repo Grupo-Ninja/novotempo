@@ -3,7 +3,14 @@ import { prisma } from "../lib/prisma";
 import { authMiddleware, adminOnly, operacionalOrAdmin } from "../middleware/auth";
 import { validate, carregamentoSchema, carregamentoUpdateSchema } from "../middleware/validate";
 import { AppError } from "../middleware/errorHandler";
-import { calcCarregamento, DEFAULT_PESO_SACA_KG, generateNumeroId } from "../lib/utils";
+import {
+  calcCarregamento,
+  DEFAULT_PESO_SACA_KG,
+  generateNumeroId,
+  parseCivilDate,
+  parseCivilDateRange,
+  shouldSyncAutoTransacao,
+} from "../lib/utils";
 
 const router = Router();
 
@@ -19,8 +26,8 @@ router.get("/", authMiddleware, async (req, res, next) => {
     if (contratoId) where.contratoId = String(contratoId);
     if (dataInicio || dataFim) {
       where.dataEnvio = {};
-      if (dataInicio) where.dataEnvio.gte = new Date(String(dataInicio));
-      if (dataFim) where.dataEnvio.lte = new Date(String(dataFim) + "T23:59:59");
+      if (dataInicio) where.dataEnvio.gte = parseCivilDateRange(String(dataInicio));
+      if (dataFim) where.dataEnvio.lte = parseCivilDateRange(String(dataFim), true);
     }
     if (comprador) where.contrato = { ...where.contrato, comprador: { nome: { contains: String(comprador), mode: "insensitive" } } };
     if (produtor) where.contrato = { ...where.contrato, produtor: { nome: { contains: String(produtor), mode: "insensitive" } } };
@@ -76,23 +83,46 @@ router.post("/", authMiddleware, operacionalOrAdmin, validate(carregamentoSchema
     }
     // ──────────────────────────────────────────────────────────────────────
 
-    const numeroId = generateNumeroId("CAR");
-    const carregamento = await prisma.carregamento.create({
-      data: {
-        numeroId,
-        contratoId: data.contratoId,
-        corretor: data.corretor ?? null,
-        motorista: data.motorista ?? null,
-        produto: data.produto ?? null,
-        observacoes: data.observacoes ?? null,
-        pesoKg: data.pesoKg,
-        qntSacas: calculado.qntSacas,
-        valorCarga: calculado.valorCarga,
-        refPeso: calculado.refPeso,
-        refValorSaca: calculado.refValorSaca,
-        umidadeSorgo: data.umidadeSorgo ?? null,
-        dataEnvio: data.dataEnvio ? new Date(data.dataEnvio) : null,
-      },
+    const dataEnvio = parseCivilDate(data.dataEnvio);
+
+    const carregamento = await prisma.$transaction(async (tx) => {
+      const numeroId = generateNumeroId("CAR");
+      const created = await tx.carregamento.create({
+        data: {
+          numeroId,
+          contratoId: data.contratoId,
+          corretor: data.corretor ?? null,
+          motorista: data.motorista ?? null,
+          produto: data.produto ?? null,
+          observacoes: data.observacoes ?? null,
+          pesoKg: data.pesoKg,
+          qntSacas: calculado.qntSacas,
+          valorCarga: calculado.valorCarga,
+          refPeso: calculado.refPeso,
+          refValorSaca: calculado.refValorSaca,
+          umidadeSorgo: data.umidadeSorgo ?? null,
+          dataEnvio,
+        },
+      });
+
+      await tx.transacao.upsert({
+        where: { carregamentoId: created.id },
+        create: {
+          numeroId: generateNumeroId("TRX"),
+          contratoId: created.contratoId,
+          carregamentoId: created.id,
+          categoria: `Carregamento ${created.numeroId}`,
+          status: "pendente",
+          valorDebitado: calculado.valorCarga,
+          refProdutor: calculado.valorCarga,
+          refComissao: 0,
+          dataTransacao: dataEnvio,
+          observacoes: "Transação gerada automaticamente a partir do carregamento.",
+        },
+        update: {},
+      });
+
+      return created;
     });
 
     res.status(201).json(carregamento);
@@ -137,11 +167,47 @@ router.put("/:id", authMiddleware, operacionalOrAdmin, validate(carregamentoUpda
     }
 
     const updateData: any = { ...data, ...calculado, pesoKg };
-    if (data.dataEnvio) updateData.dataEnvio = new Date(data.dataEnvio);
+    if (data.dataEnvio !== undefined) updateData.dataEnvio = parseCivilDate(data.dataEnvio);
 
-    const carregamento = await prisma.carregamento.update({
-      where: { id: String(req.params.id) },
-      data: updateData,
+    const carregamento = await prisma.$transaction(async (tx) => {
+      const updated = await tx.carregamento.update({
+        where: { id: String(req.params.id) },
+        data: updateData,
+      });
+
+      const existingTransacao = await tx.transacao.findUnique({
+        where: { carregamentoId: updated.id },
+      });
+
+      if (!existingTransacao) {
+        await tx.transacao.create({
+          data: {
+            numeroId: generateNumeroId("TRX"),
+            contratoId: updated.contratoId,
+            carregamentoId: updated.id,
+            categoria: `Carregamento ${updated.numeroId}`,
+            status: "pendente",
+            valorDebitado: calculado.valorCarga,
+            refProdutor: calculado.valorCarga,
+            refComissao: 0,
+            dataTransacao: updateData.dataEnvio ?? updated.dataEnvio,
+            observacoes: "Transação gerada automaticamente a partir do carregamento.",
+          },
+        });
+      } else if (shouldSyncAutoTransacao(existingTransacao.status)) {
+        await tx.transacao.update({
+          where: { id: existingTransacao.id },
+          data: {
+            contratoId: updated.contratoId,
+            categoria: `Carregamento ${updated.numeroId}`,
+            valorDebitado: calculado.valorCarga,
+            refProdutor: calculado.valorCarga,
+            dataTransacao: updateData.dataEnvio ?? updated.dataEnvio,
+          },
+        });
+      }
+
+      return updated;
     });
     res.json(carregamento);
   } catch (err) {

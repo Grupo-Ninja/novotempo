@@ -5,7 +5,7 @@ import fs from "fs";
 import { prisma } from "../lib/prisma";
 import { authMiddleware, adminOnly, operacionalOrAdmin } from "../middleware/auth";
 import { transacaoSchema, transacaoUpdateSchema } from "../middleware/validate";
-import { generateNumeroId } from "../lib/utils";
+import { calcFinancialSummary, generateNumeroId, parseCivilDate, parseCivilDateRange } from "../lib/utils";
 
 const router = Router();
 
@@ -63,26 +63,33 @@ router.get("/", authMiddleware, async (req, res, next) => {
     if (status) where.status = String(status);
     if (dataInicio || dataFim) {
       where.dataTransacao = {};
-      if (dataInicio) where.dataTransacao.gte = new Date(String(dataInicio));
-      if (dataFim) where.dataTransacao.lte = new Date(String(dataFim) + "T23:59:59");
+      if (dataInicio) where.dataTransacao.gte = parseCivilDateRange(String(dataInicio));
+      if (dataFim) where.dataTransacao.lte = parseCivilDateRange(String(dataFim), true);
     }
     if (comprador) where.contrato = { ...where.contrato, comprador: { nome: { contains: String(comprador), mode: "insensitive" } } };
     if (produtor) where.contrato = { ...where.contrato, produtor: { nome: { contains: String(produtor), mode: "insensitive" } } };
 
-    const [data, total] = await Promise.all([
+    const [data, total, allFiltered] = await Promise.all([
       prisma.transacao.findMany({
         where,
-        include: { contrato: { include: { comprador: true, produtor: true } } },
+        include: { carregamento: true, contrato: { include: { comprador: true, produtor: true } } },
         orderBy: { createdAt: "desc" },
         skip,
         take: limitNum,
       }),
       prisma.transacao.count({ where }),
+      prisma.transacao.findMany({
+        where,
+        select: { status: true, valorDebitado: true },
+      }),
     ]);
+
+    const summary = calcFinancialSummary(allFiltered);
 
     res.json({
       data,
       meta: { page: pageNum, limit: limitNum, total, totalPages: Math.ceil(total / limitNum) },
+      summary,
     });
   } catch (err) {
     next(err);
@@ -111,6 +118,7 @@ router.post(
         data: {
           numeroId,
           contratoId: data.contratoId,
+          carregamentoId: data.carregamentoId ?? null,
           categoria: data.categoria ?? null,
           metodoPagamento: data.metodoPagamento ?? null,
           nfs: data.nfs ?? null,
@@ -121,7 +129,7 @@ router.post(
           valorDebitado: data.valorDebitado,
           refProdutor: data.refProdutor,
           refComissao: data.refComissao,
-          dataTransacao: data.dataTransacao ? new Date(data.dataTransacao) : null,
+          dataTransacao: parseCivilDate(data.dataTransacao),
           comprovante: req.file ? req.file.filename : null,
         },
       });
@@ -150,7 +158,7 @@ router.put(
 
       const data = parseResult.data;
       const updateData: any = { ...data };
-      if (data.dataTransacao) updateData.dataTransacao = new Date(data.dataTransacao);
+      if (data.dataTransacao !== undefined) updateData.dataTransacao = parseCivilDate(data.dataTransacao);
 
       if (req.file) {
         const existing = await prisma.transacao.findUnique({ where: { id: String(req.params.id) } });
@@ -162,6 +170,7 @@ router.put(
       }
 
       delete updateData.contratoId;
+      delete updateData.carregamentoId;
       delete updateData.id;
 
       const transacao = await prisma.transacao.update({

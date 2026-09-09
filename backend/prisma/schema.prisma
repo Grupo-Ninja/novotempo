@@ -109,12 +109,14 @@ model Carregamento {
   updatedAt    DateTime  @updatedAt
 
   contrato Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  transacao Transacao?
 }
 
 model Transacao {
   id              String    @id @default(cuid())
   numeroId        String    @unique
   contratoId      String
+  carregamentoId  String?   @unique
   categoria       String?
   dataTransacao   DateTime?
   metodoPagamento String?
@@ -131,4 +133,5 @@ model Transacao {
   updatedAt       DateTime  @updatedAt
 
   contrato Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  carregamento Carregamento? @relation(fields: [carregamentoId], references: [id], onDelete: SetNull)
 }

@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import test from "node:test";
 import { carregamentoSchema, transacaoSchema } from "./validate";
-import { calcCarregamento } from "../lib/utils";
+import { calcCarregamento, calcFinancialSummary, parseCivilDate, parseCivilDateRange, shouldSyncAutoTransacao } from "../lib/utils";
 
 const contratoId = "contrato-1";
 
@@ -19,6 +20,20 @@ test("calcula sacas pelo peso e o valor proporcional da carga", () => {
     qntSacas: 16.667,
     valorCarga: 1_666.67,
   });
+});
+
+test("preserva data civil em dias sensiveis de calendario", () => {
+  for (const value of ["2026-09-01", "2026-02-01", "2026-02-28", "2026-12-31", "2027-01-01"]) {
+    const parsed = parseCivilDate(value);
+    assert.ok(parsed);
+    assert.equal(parsed.toISOString().slice(0, 10), value);
+  }
+});
+
+test("monta range de filtro para data civil sem deslocamento", () => {
+  assert.equal(parseCivilDateRange("2026-09-01")?.toISOString(), "2026-09-01T00:00:00.000Z");
+  assert.equal(parseCivilDateRange("2026-09-01", true)?.toISOString(), "2026-09-01T23:59:59.999Z");
+  assert.equal(parseCivilDateRange("2026-12-31", true)?.toISOString(), "2026-12-31T23:59:59.999Z");
 });
 
 test("carregamento rejeita umidade negativa e acima de 100", () => {
@@ -73,4 +88,30 @@ test("carregamento permite criar ordem sem peso informado", () => {
     assert.equal(result.data.qntSacas, 0);
     assert.equal(result.data.valorCarga, 0);
   }
+});
+
+test("calcula resumo financeiro por status de transacao", () => {
+  assert.deepEqual(calcFinancialSummary([
+    { status: "pendente", valorDebitado: 1000 },
+    { status: "pago", valorDebitado: 600 },
+    { status: "cancelado", valorDebitado: 400 },
+  ]), {
+    valorTotal: 1600,
+    valorPago: 600,
+    saldoPendente: 1000,
+  });
+});
+
+test("sincroniza somente transacao automatica pendente", () => {
+  assert.equal(shouldSyncAutoTransacao(undefined), true);
+  assert.equal(shouldSyncAutoTransacao("pendente"), true);
+  assert.equal(shouldSyncAutoTransacao("pago"), false);
+  assert.equal(shouldSyncAutoTransacao("cancelado"), false);
+});
+
+test("template do PDF mantem dados bancarios apenas do vendedor e uma quebra de pagina", () => {
+  const source = fs.readFileSync("src/routes/contratos.ts", "utf8");
+  assert.match(source, /Dados Bancarios do Vendedor/);
+  assert.doesNotMatch(source, /Dados Bancarios do Comprador/);
+  assert.equal((source.match(/<div class="page-break">/g) || []).length, 1);
 });

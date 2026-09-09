@@ -88,6 +88,7 @@ export const contratoUpdateSchema = contratoSchema.partial();
 
 export const transacaoSchema = z.object({
   contratoId:      z.string().min(1, "contratoId é obrigatório"),
+  carregamentoId:  z.string().optional().nullable(),
   categoria:       z.string().optional().nullable(),
   metodoPagamento: z.string().optional().nullable(),
   nfs:             z.string().optional().nullable(),

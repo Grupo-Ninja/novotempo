@@ -8,6 +8,34 @@ export function generateNumeroId(prefix: string): string {
 
 export const DEFAULT_PESO_SACA_KG = 60;
 
+export function roundMoney(value: number): number {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+export function parseCivilDate(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!match) return new Date(value);
+  const [, year, month, day] = match;
+  return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), 12, 0, 0, 0));
+}
+
+export function parseCivilDateRange(value: string | null | undefined, endOfDay = false): Date | undefined {
+  if (!value) return undefined;
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!match) return new Date(value);
+  const [, year, month, day] = match;
+  return new Date(Date.UTC(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    endOfDay ? 23 : 0,
+    endOfDay ? 59 : 0,
+    endOfDay ? 59 : 0,
+    endOfDay ? 999 : 0,
+  ));
+}
+
 export function calcCarregamento(
   pesoKg: number,
   refPeso: number,
@@ -21,7 +49,7 @@ export function calcCarregamento(
     refPeso: pesoPorSaca,
     refValorSaca: valorPorSaca,
     qntSacas: Math.round(quantidadeExata * 1000) / 1000,
-    valorCarga: Math.round(quantidadeExata * valorPorSaca * 100) / 100,
+    valorCarga: roundMoney(quantidadeExata * valorPorSaca),
   };
 }
 
@@ -33,13 +61,13 @@ export function calcContrato(contrato: {
   comissaoComprador?: number;
   comissaoTerceiro: number;
   carregamentos: { qntSacas: number; valorCarga: number; refPeso: number }[];
-  transacoes: { valorDebitado: number; refComissao: number; refProdutor: number }[];
+  transacoes: { valorDebitado: number; refComissao: number; refProdutor: number; status?: string }[];
 }) {
-  const valorContrato = contrato.numSacas * contrato.valorSaca;
+  const valorContrato = roundMoney(contrato.numSacas * contrato.valorSaca);
   
   // Use dual commissions if present, otherwise fallback to comissaoPorSaca
   const comissaoTotalPorSaca = (contrato.comissaoVendedor || 0) + (contrato.comissaoComprador || 0) || contrato.comissaoPorSaca;
-  const comissaoProjetada = contrato.numSacas * comissaoTotalPorSaca;
+  const comissaoProjetada = roundMoney(contrato.numSacas * comissaoTotalPorSaca);
 
   const sacasRetiradas = contrato.carregamentos.reduce(
     (s, c) => s + c.qntSacas,
@@ -54,13 +82,14 @@ export function calcContrato(contrato: {
     (s, c) => s + c.refPeso,
     0
   );
-  const saldoCarregamento = valorContrato - valorCarregado;
+  const saldoCarregamento = roundMoney(valorContrato - valorCarregado);
 
-  const totalRecebidoCarga = contrato.transacoes.reduce(
+  const transacoesPagas = contrato.transacoes.filter((t) => t.status === "pago");
+  const totalRecebidoCarga = transacoesPagas.reduce(
     (s, t) => s + t.valorDebitado,
     0
   );
-  const comissaoRecebida = contrato.transacoes.reduce(
+  const comissaoRecebida = transacoesPagas.reduce(
     (s, t) => s + t.refComissao,
     0
   );
@@ -71,10 +100,10 @@ export function calcContrato(contrato: {
 
   const percRecebida =
     valorContrato > 0 ? (totalRecebidoCarga / valorContrato) * 100 : 0;
-  const aReceberCarga = valorContrato - totalRecebidoCarga;
+  const aReceberCarga = roundMoney(valorCarregado - totalRecebidoCarga);
   const percComissao =
     comissaoProjetada > 0 ? (comissaoRecebida / comissaoProjetada) * 100 : 0;
-  const comissaoAReceber = comissaoProjetada - comissaoRecebida;
+  const comissaoAReceber = roundMoney(comissaoProjetada - comissaoRecebida);
 
   return {
     valorContrato,
@@ -92,4 +121,26 @@ export function calcContrato(contrato: {
     percComissao,
     comissaoAReceber,
   };
+}
+
+export function calcFinancialSummary(transacoes: { status: string; valorDebitado: number }[]) {
+  const valorTotal = roundMoney(
+    transacoes
+      .filter((t) => t.status !== "cancelado")
+      .reduce((s, t) => s + t.valorDebitado, 0)
+  );
+  const valorPago = roundMoney(
+    transacoes
+      .filter((t) => t.status === "pago")
+      .reduce((s, t) => s + t.valorDebitado, 0)
+  );
+  return {
+    valorTotal,
+    valorPago,
+    saldoPendente: roundMoney(valorTotal - valorPago),
+  };
+}
+
+export function shouldSyncAutoTransacao(status?: string | null): boolean {
+  return !status || status === "pendente";
 }

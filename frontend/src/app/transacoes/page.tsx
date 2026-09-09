@@ -14,6 +14,7 @@ interface Transacao {
   id: string; numeroId: string; categoria?: string; dataTransacao?: string;
   metodoPagamento?: string; nfs?: string; nfAcesso?: string; status: string;
   valorDebitado: number; refComissao: number;
+  carregamento?: { id: string; numeroId: string } | null;
   contrato: { id: string; numeroId: string; comprador: { nome: string }; produtor: { nome: string }; };
 }
 
@@ -27,6 +28,7 @@ export default function TransacoesPage() {
   const [produtor, setProdutor] = useState("");
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, totalPages: 1 });
+  const [summary, setSummary] = useState({ valorTotal: 0, valorPago: 0, saldoPendente: 0 });
 
   async function load(p = page) {
     setLoading(true);
@@ -43,8 +45,10 @@ export default function TransacoesPage() {
       const data = await res.json();
       setItems(Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []));
       if (data.meta) setMeta({ total: data.meta.total, totalPages: data.meta.totalPages });
+      if (data.summary) setSummary(data.summary);
     } catch {
       setItems([]);
+      setSummary({ valorTotal: 0, valorPago: 0, saldoPendente: 0 });
     }
     setLoading(false);
   }
@@ -56,17 +60,16 @@ export default function TransacoesPage() {
     setStatus(""); setDataInicio(""); setDataFim(""); setComprador(""); setProdutor("");
   }
 
-  const totalDebitado = items.reduce((s, t) => s + t.valorDebitado, 0);
-  const totalComissao = items.reduce((s, t) => s + t.refComissao, 0);
   const hasFilters = status || dataInicio || dataFim || comprador || produtor;
 
   return (
     <DashboardLayout>
       <PageHeader title="Transações" subtitle={`${meta.total} registros`} />
 
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Total Debitado</p><p className="text-xl font-bold text-bt-dark">{formatCurrency(totalDebitado)}</p></div>
-        <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Total Comissão</p><p className="text-xl font-bold text-green-700">{formatCurrency(totalComissao)}</p></div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Valor Total</p><p className="text-xl font-bold text-bt-dark">{formatCurrency(summary.valorTotal)}</p></div>
+        <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Valor Pago</p><p className="text-xl font-bold text-green-700">{formatCurrency(summary.valorPago)}</p></div>
+        <div className="card text-center"><p className="text-xs text-gray-500 mb-1">Saldo Pendente</p><p className="text-xl font-bold text-amber-700">{formatCurrency(summary.saldoPendente)}</p></div>
       </div>
 
       <div className="card">
@@ -111,7 +114,7 @@ export default function TransacoesPage() {
             <table className="w-full min-w-[1000px]">
               <thead><tr className="border-b border-gray-100">
                 <th className="table-th">ID</th><th className="table-th">Contrato</th>
-                <th className="table-th">Comprador</th><th className="table-th">Categoria</th>
+                <th className="table-th">Comprador</th><th className="table-th">Carregamento</th><th className="table-th">Categoria</th>
                 <th className="table-th">Data</th><th className="table-th">Método</th>
                 <th className="table-th">Valor Debitado</th><th className="table-th">Ref. Comissão</th>
                 <th className="table-th">NF Balança</th><th className="table-th">NF Acesso</th>
@@ -119,12 +122,13 @@ export default function TransacoesPage() {
               </tr></thead>
               <tbody className="divide-y divide-gray-50">
                 {items.length === 0 ? (
-                  <tr><td colSpan={11} className="table-td text-center text-gray-400 py-10">Nenhuma transação encontrada</td></tr>
+                  <tr><td colSpan={12} className="table-td text-center text-gray-400 py-10">Nenhuma transação encontrada</td></tr>
                 ) : items.map((t) => (
                   <tr key={t.id} className="hover:bg-gray-50">
                     <td className="table-td text-xs text-gray-500">{t.numeroId}</td>
                     <td className="table-td"><Link href={`/contratos/${t.contrato?.id}`} className="text-bt-mid font-medium hover:underline">{t.contrato?.numeroId}</Link></td>
                     <td className="table-td">{t.contrato?.comprador?.nome || "-"}</td>
+                    <td className="table-td text-xs">{t.carregamento?.numeroId || "-"}</td>
                     <td className="table-td">{t.categoria || "-"}</td>
                     <td className="table-td">{formatDate(t.dataTransacao)}</td>
                     <td className="table-td">{t.metodoPagamento || "-"}</td>

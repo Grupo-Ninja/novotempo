@@ -3,7 +3,7 @@ import { prisma } from "../lib/prisma";
 import { authMiddleware, adminOnly } from "../middleware/auth";
 import { validate, contratoSchema, contratoUpdateSchema } from "../middleware/validate";
 import { AppError } from "../middleware/errorHandler";
-import { generateNumeroId, calcContrato } from "../lib/utils";
+import { generateNumeroId, calcContrato, parseCivilDate, parseCivilDateRange } from "../lib/utils";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -24,11 +24,9 @@ router.get("/", authMiddleware, async (req, res, next) => {
     if (produtor) where.produtor = { nome: { contains: String(produtor), mode: "insensitive" } };
     if (dataInicio || dataFim) {
       where.dataFechamento = {};
-      if (dataInicio) where.dataFechamento.gte = new Date(String(dataInicio));
+      if (dataInicio) where.dataFechamento.gte = parseCivilDateRange(String(dataInicio));
       if (dataFim) {
-        const fim = new Date(String(dataFim));
-        fim.setHours(23, 59, 59, 999);
-        where.dataFechamento.lte = fim;
+        where.dataFechamento.lte = parseCivilDateRange(String(dataFim), true);
       }
     }
     if (q) {
@@ -110,9 +108,9 @@ router.post("/", authMiddleware, adminOnly, validate(contratoSchema), async (req
         fechamentoDestino: data.fechamentoDestino ?? null,
         observacoes: data.observacoes ?? null,
         padraoQualidade: data.padraoQualidade ?? null,
-        dataFechamento: data.dataFechamento ? new Date(data.dataFechamento) : null,
-        inicio: data.inicio ? new Date(data.inicio) : null,
-        termino: data.termino ? new Date(data.termino) : null,
+        dataFechamento: parseCivilDate(data.dataFechamento),
+        inicio: parseCivilDate(data.inicio),
+        termino: parseCivilDate(data.termino),
       },
       include: { comprador: true, produtor: true, carregamentos: true, transacoes: true },
     });
@@ -156,9 +154,9 @@ router.put("/:id", authMiddleware, adminOnly, validate(contratoUpdateSchema), as
     // ──────────────────────────────────────────────────────────────────────
 
     const updateData: any = { ...data };
-    if (data.dataFechamento) updateData.dataFechamento = new Date(data.dataFechamento);
-    if (data.inicio) updateData.inicio = new Date(data.inicio);
-    if (data.termino) updateData.termino = new Date(data.termino);
+    if (data.dataFechamento !== undefined) updateData.dataFechamento = parseCivilDate(data.dataFechamento);
+    if (data.inicio !== undefined) updateData.inicio = parseCivilDate(data.inicio);
+    if (data.termino !== undefined) updateData.termino = parseCivilDate(data.termino);
 
     // Strip relations from body
     delete updateData.comprador;
@@ -192,17 +190,17 @@ router.delete("/:id", authMiddleware, adminOnly, async (req, res, next) => {
 
 const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtN = (n: number, d = 2) => n.toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d });
-const fmtD = (d: any) => d ? new Date(d).toLocaleDateString("pt-BR") : "-";
+const fmtD = (d: any) => {
+  if (!d) return "-";
+  if (typeof d === "string") {
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(d);
+    if (match) return `${match[3]}/${match[2]}/${match[1]}`;
+  }
+  return new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" });
+};
 const bankValue = (value?: string | null) => value?.trim() || "-";
-
-function bankRows(cliente: { banco?: string | null; agencia?: string | null; conta?: string | null; pix?: string | null }) {
-  return `
-    <div class="drow"><span class="dlabel">Banco:</span><span class="dval">${bankValue(cliente.banco)}</span></div>
-    <div class="drow"><span class="dlabel">Agencia:</span><span class="dval">${bankValue(cliente.agencia)}</span></div>
-    <div class="drow"><span class="dlabel">Conta:</span><span class="dval">${bankValue(cliente.conta)}</span></div>
-    <div class="drow"><span class="dlabel">PIX:</span><span class="dval">${bankValue(cliente.pix)}</span></div>
-  `;
-}
+const hasBankDetails = (cliente: { banco?: string | null; agencia?: string | null; conta?: string | null; pix?: string | null }) =>
+  Boolean(cliente.banco?.trim() || cliente.agencia?.trim() || cliente.conta?.trim() || cliente.pix?.trim());
 
 function loadLogo(): string {
   const candidates = [
@@ -292,9 +290,9 @@ router.get("/:id/pdf", authMiddleware, async (req, res, next) => {
     /* ── Page setup ──────────────────────────────────────────────────── */
     @page {
       size: A4 portrait;
-      margin: 30mm 20mm 20mm 30mm;
+      margin: 16mm 14mm 14mm 16mm;
     }
-    @page :first { margin-top: 30mm; }
+    @page :first { margin-top: 16mm; }
 
     * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
@@ -334,7 +332,7 @@ router.get("/:id/pdf", authMiddleware, async (req, res, next) => {
       border: 1pt solid #2d5a27;
       padding: 5pt 8pt;
       margin-top: 10pt;
-      margin-bottom: 25pt;
+      margin-bottom: 10pt;
     }
 
     /* ── Section header ──────────────────────────────────────────────── */
@@ -350,7 +348,7 @@ router.get("/:id/pdf", authMiddleware, async (req, res, next) => {
     }
 
     /* ── Two-column grid ─────────────────────────────────────────────── */
-    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12pt; margin-bottom: 10pt; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10pt; margin-bottom: 8pt; }
 
     /* ── Data rows ───────────────────────────────────────────────────── */
     .drow { display: flex; border-bottom: 0.5pt solid #ddd; padding: 2pt 0; font-size: 9pt; }
@@ -367,8 +365,8 @@ router.get("/:id/pdf", authMiddleware, async (req, res, next) => {
     table.quality {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 10pt;
-      font-size: 8.5pt;
+      margin-bottom: 8pt;
+      font-size: 8pt;
     }
     table.quality th {
       background: #f2f2f2;
@@ -408,9 +406,9 @@ router.get("/:id/pdf", authMiddleware, async (req, res, next) => {
     .clauses {
       font-size: 8pt;
       text-align: justify;
-      line-height: 1.45;
+      line-height: 1.35;
       color: #333;
-      margin-bottom: 14pt;
+      margin-bottom: 10pt;
     }
     .clauses b { color: #000; }
 
@@ -419,10 +417,10 @@ router.get("/:id/pdf", authMiddleware, async (req, res, next) => {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10pt 30pt;
-      margin-top: 16pt;
+      margin-top: 10pt;
     }
     .sig-block { text-align: center; }
-    .sig-line { border-top: 0.75pt solid #222; margin-top: 32pt; padding-top: 3pt; font-size: 8.5pt; font-weight: bold; }
+    .sig-line { border-top: 0.75pt solid #222; margin-top: 24pt; padding-top: 3pt; font-size: 8.5pt; font-weight: bold; }
     .sig-sub { font-size: 7.5pt; color: #555; margin-top: 1pt; }
 
     /* ── Footer ──────────────────────────────────────────────────────── */
@@ -529,17 +527,22 @@ router.get("/:id/pdf", authMiddleware, async (req, res, next) => {
     </div>
   </div>
 
-  <!-- Bank details -->
-  <div class="grid2">
-    <div class="bank-block">
+  ${hasBankDetails(contrato.produtor) ? `
+    <!-- Bank details -->
+    <div class="bank-block" style="margin-bottom: 8pt;">
       <div class="sec-head">Dados Bancarios do Vendedor</div>
-      ${bankRows(contrato.produtor)}
+      <div class="grid2" style="margin-bottom:0;">
+        <div>
+          <div class="drow"><span class="dlabel">Banco:</span><span class="dval">${bankValue(contrato.produtor.banco)}</span></div>
+          <div class="drow"><span class="dlabel">Agencia:</span><span class="dval">${bankValue(contrato.produtor.agencia)}</span></div>
+        </div>
+        <div>
+          <div class="drow"><span class="dlabel">Conta:</span><span class="dval">${bankValue(contrato.produtor.conta)}</span></div>
+          <div class="drow"><span class="dlabel">PIX:</span><span class="dval">${bankValue(contrato.produtor.pix)}</span></div>
+        </div>
+      </div>
     </div>
-    <div class="bank-block">
-      <div class="sec-head">Dados Bancarios do Comprador</div>
-      ${bankRows(contrato.comprador)}
-    </div>
-  </div>
+  ` : ""}
 
   <!-- Quality standards -->
   <div class="sec-head">Padrão de Qualidade</div>
@@ -589,7 +592,7 @@ router.get("/:id/pdf", authMiddleware, async (req, res, next) => {
   <!-- Clauses & Signatures moved to Page 2 -->
 
   <!-- Footer -->
-  <div class="doc-footer" style="margin-top: 40pt;">
+  <div class="doc-footer">
     Documento gerado em ${new Date().toLocaleString("pt-BR")} · Intermediado por JP Agro — Grãos e Transporte · Página 1 de 2
   </div>
 
