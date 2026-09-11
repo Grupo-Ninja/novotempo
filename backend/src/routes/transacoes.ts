@@ -130,6 +130,7 @@ router.post(
           refProdutor: data.refProdutor,
           refComissao: data.refComissao,
           dataTransacao: parseCivilDate(data.dataTransacao),
+          dataPagamento: data.status === "pago" ? new Date() : null,
           comprovante: req.file ? req.file.filename : null,
         },
       });
@@ -160,6 +161,14 @@ router.put(
       const updateData: any = { ...data };
       if (data.dataTransacao !== undefined) updateData.dataTransacao = parseCivilDate(data.dataTransacao);
 
+      // A payment confirmation never changes the financial snapshot, even if
+      // an older client submits a full form with empty monetary inputs.
+      if (data.status === "pago") {
+        delete updateData.valorDebitado;
+        delete updateData.refProdutor;
+        delete updateData.refComissao;
+      }
+
       if (req.file) {
         const existing = await prisma.transacao.findUnique({ where: { id: String(req.params.id) } });
         if (existing?.comprovante) {
@@ -173,9 +182,16 @@ router.put(
       delete updateData.carregamentoId;
       delete updateData.id;
 
-      const transacao = await prisma.transacao.update({
-        where: { id: String(req.params.id) },
-        data: updateData,
+      const transacao = await prisma.$transaction(async (tx) => {
+        const where = { id: String(req.params.id) };
+        if (data.status === "pago") {
+          // Conditional write preserves the first confirmation on retries.
+          await tx.transacao.updateMany({
+            where: { ...where, status: { not: "pago" }, dataPagamento: null },
+            data: { dataPagamento: new Date() },
+          });
+        }
+        return tx.transacao.update({ where, data: updateData });
       });
       res.json(transacao);
     } catch (err) {

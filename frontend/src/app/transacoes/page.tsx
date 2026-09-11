@@ -11,7 +11,7 @@ import { apiFetch } from "@/lib/api";
 const LIMIT = 20;
 
 interface Transacao {
-  id: string; numeroId: string; categoria?: string; dataTransacao?: string;
+  id: string; numeroId: string; categoria?: string; dataTransacao?: string; createdAt?: string; dataPagamento?: string;
   metodoPagamento?: string; nfs?: string; nfAcesso?: string; status: string;
   valorDebitado: number; refComissao: number;
   carregamento?: { id: string; numeroId: string } | null;
@@ -115,14 +115,14 @@ export default function TransacoesPage() {
               <thead><tr className="border-b border-gray-100">
                 <th className="table-th">ID</th><th className="table-th">Contrato</th>
                 <th className="table-th">Comprador</th><th className="table-th">Carregamento</th><th className="table-th">Categoria</th>
-                <th className="table-th">Data</th><th className="table-th">Método</th>
+                <th className="table-th">Criação</th><th className="table-th">Pagamento</th><th className="table-th">Data</th><th className="table-th">Método</th>
                 <th className="table-th">Valor Debitado</th><th className="table-th">Ref. Comissão</th>
                 <th className="table-th">NF Balança</th><th className="table-th">NF Acesso</th>
                 <th className="table-th">Status</th>
               </tr></thead>
               <tbody className="divide-y divide-gray-50">
                 {items.length === 0 ? (
-                  <tr><td colSpan={12} className="table-td text-center text-gray-400 py-10">Nenhuma transação encontrada</td></tr>
+                  <tr><td colSpan={14} className="table-td text-center text-gray-400 py-10">Nenhuma transação encontrada</td></tr>
                 ) : items.map((t) => (
                   <tr key={t.id} className="hover:bg-gray-50">
                     <td className="table-td text-xs text-gray-500">{t.numeroId}</td>
@@ -130,6 +130,8 @@ export default function TransacoesPage() {
                     <td className="table-td">{t.contrato?.comprador?.nome || "-"}</td>
                     <td className="table-td text-xs">{t.carregamento?.numeroId || "-"}</td>
                     <td className="table-td">{t.categoria || "-"}</td>
+                    <td className="table-td">{formatDate(t.createdAt ? new Date(t.createdAt) : null)}</td>
+                    <td className="table-td">{formatDate(t.dataPagamento ? new Date(t.dataPagamento) : null)}</td>
                     <td className="table-td">{formatDate(t.dataTransacao)}</td>
                     <td className="table-td">{t.metodoPagamento || "-"}</td>
                     <td className="table-td font-medium">{formatCurrency(t.valorDebitado)}</td>

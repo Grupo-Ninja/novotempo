@@ -195,8 +195,8 @@ router.put("/:id", authMiddleware, operacionalOrAdmin, validate(carregamentoUpda
           },
         });
       } else if (shouldSyncAutoTransacao(existingTransacao.status)) {
-        await tx.transacao.update({
-          where: { id: existingTransacao.id },
+        await tx.transacao.updateMany({
+          where: { id: existingTransacao.id, status: "pendente" },
           data: {
             contratoId: updated.contratoId,
             categoria: `Carregamento ${updated.numeroId}`,

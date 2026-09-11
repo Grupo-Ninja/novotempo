@@ -1,10 +1,25 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
-import { carregamentoSchema, transacaoSchema } from "./validate";
+import { carregamentoSchema, transacaoSchema, transacaoUpdateSchema } from "./validate";
 import { calcCarregamento, calcFinancialSummary, parseCivilDate, parseCivilDateRange, shouldSyncAutoTransacao } from "../lib/utils";
 
 const contratoId = "contrato-1";
+
+test("pagamento parcial não introduz zeros nem campos ausentes", () => {
+  assert.deepEqual(transacaoUpdateSchema.parse({ status: "pago" }), { status: "pago" });
+  assert.deepEqual(transacaoUpdateSchema.parse({ nfs: "123" }), { nfs: "123" });
+  assert.deepEqual(transacaoUpdateSchema.parse({}), {});
+  assert.deepEqual(transacaoUpdateSchema.parse({ valorDebitado: "123.45" }), { valorDebitado: 123.45 });
+});
+
+test("pagar preserva saldo total e transfere pendente para pago", () => {
+  const rows = [{ status: "pendente", valorDebitado: 123.45 }, { status: "pendente", valorDebitado: 200 }];
+  assert.deepEqual(calcFinancialSummary(rows), { valorTotal: 323.45, valorPago: 0, saldoPendente: 323.45 });
+  rows[0] = { ...rows[0], ...transacaoUpdateSchema.parse({ status: "pago" }) };
+  assert.equal(rows[0].valorDebitado, 123.45);
+  assert.deepEqual(calcFinancialSummary(rows), { valorTotal: 323.45, valorPago: 123.45, saldoPendente: 200 });
+});
 
 test("calcula sacas pelo peso e o valor proporcional da carga", () => {
   assert.deepEqual(calcCarregamento(30_000, 60, 100), {

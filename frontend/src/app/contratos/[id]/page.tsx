@@ -38,7 +38,7 @@ interface Carregamento {
   refValorSaca: number; umidadeSorgo?: number; observacoes?: string;
 }
 interface Transacao {
-  id: string; numeroId: string; categoria?: string; dataTransacao?: string;
+  id: string; numeroId: string; categoria?: string; dataTransacao?: string; createdAt?: string; dataPagamento?: string;
   metodoPagamento?: string; nfs?: string; nfAcesso?: string; status: string; tipoDaNota?: string;
   valorDebitado: number; refProdutor: number; refComissao: number; observacoes?: string;
 }
@@ -184,6 +184,7 @@ export default function ContratoDetailPage() {
   const [modalLoading, setModalLoading] = useState(false);
   const modalSubmittingRef = useRef(false);
   const [modalError, setModalError] = useState("");
+  const [paymentError, setPaymentError] = useState("");
   const [confirmingPago, setConfirmingPago] = useState<string | null>(null);
 
   // Motorista combobox
@@ -317,13 +318,17 @@ export default function ContratoDetailPage() {
 
   async function confirmarPago(trxId: string) {
     setConfirmingPago(trxId);
+    setPaymentError("");
     try {
-      await apiFetch(`/transacoes/${trxId}`, {
+      const res = await apiFetch(`/transacoes/${trxId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "pago" }),
       });
-      load();
+      if (!res.ok) throw await responseError(res, "Erro ao confirmar pagamento");
+      await load();
+    } catch (err) {
+      setPaymentError(err instanceof Error ? err.message : "Erro ao confirmar pagamento");
     } finally {
       setConfirmingPago(null);
     }
@@ -778,6 +783,7 @@ export default function ContratoDetailPage() {
               <h3 className="font-semibold text-gray-800">Transações ({contrato.transacoes.length})</h3>
               <button onClick={() => openTrxModal()} className="btn-primary text-sm py-1.5">+ Adicionar</button>
             </div>
+            {paymentError && <p role="alert" className="text-red-600 mb-3">{paymentError}</p>}
             {contrato.transacoes.length === 0 ? (
               <p className="text-sm text-gray-400 text-center py-4">Nenhuma transação registrada</p>
             ) : (
@@ -785,7 +791,8 @@ export default function ContratoDetailPage() {
                 <table className="w-full min-w-[800px]">
                   <thead><tr className="border-b border-gray-100">
                     <th className="table-th">ID</th><th className="table-th">Categoria</th>
-                    <th className="table-th">Data</th><th className="table-th">Método</th>
+                    <th className="table-th">Data</th><th className="table-th">Criação</th>
+                    <th className="table-th">Pagamento</th><th className="table-th">Método</th>
                     <th className="table-th">Valor Debitado</th><th className="table-th">Ref. Comissão</th>
                     <th className="table-th">NF Balança</th><th className="table-th">NF Acesso</th>
                     <th className="table-th">Status</th><th className="table-th">Ações</th>
@@ -796,6 +803,8 @@ export default function ContratoDetailPage() {
                         <td className="table-td text-xs text-gray-500">{t.numeroId}</td>
                         <td className="table-td">{t.categoria || "-"}</td>
                         <td className="table-td">{formatDate(t.dataTransacao)}</td>
+                        <td className="table-td">{formatDate(t.createdAt ? new Date(t.createdAt) : null)}</td>
+                        <td className="table-td">{formatDate(t.dataPagamento ? new Date(t.dataPagamento) : null)}</td>
                         <td className="table-td">{t.metodoPagamento || "-"}</td>
                         <td className="table-td font-medium">{formatCurrency(t.valorDebitado)}</td>
                         <td className="table-td">{formatCurrency(t.refComissao)}</td>
@@ -820,12 +829,18 @@ export default function ContratoDetailPage() {
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot><tr className="bg-bt-pale">
-                    <td colSpan={4} className="table-td font-semibold text-bt-dark">Total</td>
-                    <td className="table-td font-semibold">{formatCurrency(calc.totalRecebidoCarga)}</td>
-                    <td className="table-td font-semibold">{formatCurrency(calc.comissaoRecebida)}</td>
-                    <td colSpan={4} />
-                  </tr></tfoot>
+                  <tfoot>{[
+                    { label: "Total geral", rows: contrato.transacoes.filter(t => t.status !== "cancelado") },
+                    { label: "Pago", rows: contrato.transacoes.filter(t => t.status === "pago") },
+                    { label: "Pendente", rows: contrato.transacoes.filter(t => t.status === "pendente") },
+                  ].map(({ label, rows }) => (
+                    <tr key={label} className="bg-bt-pale">
+                      <td colSpan={6} className="table-td font-semibold text-bt-dark">{label}</td>
+                      <td className="table-td font-semibold">{formatCurrency(rows.reduce((sum, t) => sum + t.valorDebitado, 0))}</td>
+                      <td className="table-td font-semibold">{formatCurrency(rows.reduce((sum, t) => sum + t.refComissao, 0))}</td>
+                      <td colSpan={4} />
+                    </tr>
+                  ))}</tfoot>
                 </table>
               </div>
             )}

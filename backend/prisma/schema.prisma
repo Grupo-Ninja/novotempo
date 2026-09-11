@@ -119,6 +119,7 @@ model Transacao {
   carregamentoId  String?   @unique
   categoria       String?
   dataTransacao   DateTime?
+  dataPagamento   DateTime?
   metodoPagamento String?
   nfs             String?   // NF de Peso de Balança
   nfAcesso        String?   // NF de Acesso

@@ -56,8 +56,8 @@ function modalFor(title: string): HTMLElement {
   return heading.parentElement?.parentElement as HTMLElement;
 }
 
-async function renderPage(post?: (path: string, options: RequestInit) => Promise<ApiResponse>) {
-  let contract = baseContract();
+async function renderPage(post?: (path: string, options: RequestInit) => Promise<ApiResponse>, initial = baseContract()) {
+  let contract = initial;
   apiFetchMock.mockImplementation(async (path: string, options: RequestInit = {}) => {
     if (path === "/contratos/contrato-1" && !options.method) return response(contract);
     if (path.startsWith("/clientes")) return response({ data: [] });
@@ -65,9 +65,10 @@ async function renderPage(post?: (path: string, options: RequestInit) => Promise
     if (post && (options.method === "POST" || options.method === "PUT")) return post(path, options);
     throw new Error(`Requisição inesperada: ${options.method || "GET"} ${path}`);
   });
-  render(createElement(ContratoDetailPage));
-  await screen.findByText("Transações (0)");
+  const view = render(createElement(ContratoDetailPage));
+  await screen.findByText(`Transações (${initial.transacoes.length})`);
   return {
+    unmount: view.unmount,
     setContract(next: ReturnType<typeof baseContract>) { contract = next; },
   };
 }
@@ -244,5 +245,45 @@ describe("modais do contrato", () => {
     expect(screen.getByText("Carregamentos (1)")).toBeTruthy();
     expect(screen.getByText("Joao Silva")).toBeTruthy();
     expect(screen.getAllByText("Pendente").length).toBeGreaterThan(0);
+  });
+});
+
+
+describe("pagamento", () => {
+  it("preserva valor e historico ao pagar e remontar a pagina", async () => {
+    const trx = { id: "trx-paid", numeroId: "TRX-PAGO", status: "pendente", valorDebitado: 123.45,
+      refProdutor: 123.45, refComissao: 0, createdAt: "2026-09-10T12:00:00Z" };
+    const initial = { ...baseContract(), transacoes: [trx] };
+    let saved = initial;
+    const harness = await renderPage(async (path, options) => {
+      expect(path).toBe("/transacoes/trx-paid");
+      expect(options.method).toBe("PUT");
+      expect(JSON.parse(String(options.body))).toEqual({ status: "pago" });
+      saved = { ...initial, transacoes: [{ ...trx, status: "pago" }] };
+      harness.setContract(saved);
+      return response(saved.transacoes[0]);
+    }, initial);
+    fireEvent.click(screen.getByRole("button", { name: /Pago/ }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: /Pago/ })).toBeNull());
+    const row = screen.getByText("TRX-PAGO").closest("tr")!;
+    expect(within(row).getByText("Pago")).toBeTruthy();
+    expect(within(row).getByText(/123,45/)).toBeTruthy();
+    expect(apiFetchMock.mock.calls.some(([, options]) => options?.method === "DELETE")).toBe(false);
+    harness.unmount();
+    await renderPage(undefined, saved);
+    expect(within(screen.getByText("TRX-PAGO").closest("tr")!).getByText(/123,45/)).toBeTruthy();
+    const table = screen.getByText("TRX-PAGO").closest("table")!;
+    expect(within(table).getByText("Total geral")).toBeTruthy();
+    expect(within(table).getByText("Pendente").closest("tr")!.textContent).toMatch(/0,00/);
+  });
+
+  it("mantem pendente e informa erro quando API recusa pagamento", async () => {
+    const initial = { ...baseContract(), transacoes: [{ id: "trx-fail", numeroId: "TRX-FALHA",
+      status: "pendente", valorDebitado: 321, refProdutor: 321, refComissao: 0 }] };
+    await renderPage(async () => response({ error: "Pagamento recusado" }, 422), initial);
+    fireEvent.click(screen.getByRole("button", { name: /Pago/ }));
+    expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Pagamento recusado");
+    expect(screen.getByRole("button", { name: /Pago/ })).toBeTruthy();
+    expect(within(screen.getByText("TRX-FALHA").closest("tr")!).getByText(/321,00/)).toBeTruthy();
   });
 });

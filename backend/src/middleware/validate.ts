@@ -102,7 +102,15 @@ export const transacaoSchema = z.object({
   dataTransacao:   z.string().optional().nullable(),
 });
 
-export const transacaoUpdateSchema = transacaoSchema.omit({ contratoId: true }).partial();
+// Zod 4 applies inner defaults even inside partial(): updates must have none.
+export const transacaoUpdateSchema = transacaoSchema
+  .omit({ contratoId: true, carregamentoId: true })
+  .extend({
+    status: transacaoSchema.shape.status.removeDefault(),
+    valorDebitado: transacaoSchema.shape.valorDebitado.removeDefault(),
+    refProdutor: transacaoSchema.shape.refProdutor.removeDefault(),
+    refComissao: transacaoSchema.shape.refComissao.removeDefault(),
+  }).partial();
 
 export const clienteSchema = z.object({
   nome:              z.string().min(1, "Nome é obrigatório"),
