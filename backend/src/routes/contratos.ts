@@ -3,7 +3,7 @@ import { prisma } from "../lib/prisma";
 import { authMiddleware, adminOnly } from "../middleware/auth";
 import { validate, contratoSchema, contratoUpdateSchema } from "../middleware/validate";
 import { AppError } from "../middleware/errorHandler";
-import { generateNumeroId, calcContrato, parseCivilDate, parseCivilDateRange } from "../lib/utils";
+import { generateNumeroId, calcContrato, parseCivilDate, parseCivilDateRange, formatContractDisplayNumber, getContratoDisplayNumber } from "../lib/utils";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -31,6 +31,7 @@ router.get("/", authMiddleware, async (req, res, next) => {
     }
     if (q) {
       where.OR = [
+        { displayNumber: { contains: String(q), mode: "insensitive" } },
         { numeroId: { contains: String(q), mode: "insensitive" } },
         { produto: { contains: String(q), mode: "insensitive" } },
         { comprador: { nome: { contains: String(q), mode: "insensitive" } } },
@@ -81,38 +82,44 @@ router.get("/:id", authMiddleware, async (req, res, next) => {
 router.post("/", authMiddleware, adminOnly, validate(contratoSchema), async (req, res, next) => {
   try {
     const data = req.body;
-    const numeroId = generateNumeroId("CTR");
 
-    const contrato = await (prisma.contrato.create as any)({
-      data: {
-        numeroId,
-        status: data.status,
-        produto: data.produto,
-        compradorId: data.compradorId,
-        produtorId: data.produtorId,
-        cidade: data.cidade ?? null,
-        numSacas: data.numSacas,
-        valorSaca: data.valorSaca,
-        comissaoPorSaca: data.comissaoPorSaca,
-        comissaoTerceiro: data.comissaoTerceiro,
-        comissaoPagaPor: data.comissaoPagaPor,
-        comissaoVendedor: data.comissaoVendedor,
-        comissaoComprador: data.comissaoComprador,
-        fretePorConta: data.fretePorConta ?? null,
-        localRetirada: data.localRetirada ?? null,
-        condicoesPagamento: data.condicoesPagamento ?? null,
-        funrural: data.funrural,
-        foro: data.foro ?? null,
-        refPeso: data.refPeso,
-        fechamentoOrigem: data.fechamentoOrigem ?? null,
-        fechamentoDestino: data.fechamentoDestino ?? null,
-        observacoes: data.observacoes ?? null,
-        padraoQualidade: data.padraoQualidade ?? null,
-        dataFechamento: parseCivilDate(data.dataFechamento),
-        inicio: parseCivilDate(data.inicio),
-        termino: parseCivilDate(data.termino),
-      },
-      include: { comprador: true, produtor: true, carregamentos: true, transacoes: true },
+    const contrato = await prisma.$transaction(async (tx) => {
+      const numeroId = generateNumeroId("CTR");
+      const sequenceRows = await tx.$queryRaw<{ nextval: bigint }[]>`SELECT nextval('contract_display_number_seq')`;
+      const displayNumber = formatContractDisplayNumber(sequenceRows[0].nextval);
+
+      return (tx.contrato.create as any)({
+        data: {
+          numeroId,
+          displayNumber,
+          status: data.status,
+          produto: data.produto,
+          compradorId: data.compradorId,
+          produtorId: data.produtorId,
+          cidade: data.cidade ?? null,
+          numSacas: data.numSacas,
+          valorSaca: data.valorSaca,
+          comissaoPorSaca: data.comissaoPorSaca,
+          comissaoTerceiro: data.comissaoTerceiro,
+          comissaoPagaPor: data.comissaoPagaPor,
+          comissaoVendedor: data.comissaoVendedor,
+          comissaoComprador: data.comissaoComprador,
+          fretePorConta: data.fretePorConta ?? null,
+          localRetirada: data.localRetirada ?? null,
+          condicoesPagamento: data.condicoesPagamento ?? null,
+          funrural: data.funrural,
+          foro: data.foro ?? null,
+          refPeso: data.refPeso,
+          fechamentoOrigem: data.fechamentoOrigem ?? null,
+          fechamentoDestino: data.fechamentoDestino ?? null,
+          observacoes: data.observacoes ?? null,
+          padraoQualidade: data.padraoQualidade ?? null,
+          dataFechamento: parseCivilDate(data.dataFechamento),
+          inicio: parseCivilDate(data.inicio),
+          termino: parseCivilDate(data.termino),
+        },
+        include: { comprador: true, produtor: true, carregamentos: true, transacoes: true },
+      });
     });
 
     res.status(201).json(contrato);
@@ -285,7 +292,7 @@ router.get("/:id/pdf", authMiddleware, async (req, res, next) => {
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8"/>
-  <title>Contrato ${contrato.numeroId}</title>
+  <title>Contrato ${getContratoDisplayNumber(contrato)}</title>
   <style>
     /* ── Page setup ──────────────────────────────────────────────────── */
     @page {
@@ -501,7 +508,7 @@ router.get("/:id/pdf", authMiddleware, async (req, res, next) => {
   </div>
 
   <!-- Title -->
-  <div class="doc-title">Contrato de Compra e Venda de Grãos · Nº ${contrato.numeroId}</div>
+  <div class="doc-title">Contrato de Compra e Venda de Grãos · Nº ${getContratoDisplayNumber(contrato)}</div>
 
   <!-- Parties -->
   <div class="grid2">
@@ -613,7 +620,7 @@ router.get("/:id/pdf", authMiddleware, async (req, res, next) => {
       </div>
     </div>
     <div class="header-meta">
-      Contrato Nº ${contrato.numeroId}<br/>
+      Contrato Nº ${getContratoDisplayNumber(contrato)}<br/>
       Anexo e Assinaturas<br/>
       Página 2 de 2
     </div>

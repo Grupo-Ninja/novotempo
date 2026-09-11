@@ -4,7 +4,7 @@ import { ContratoStatusBadge, TransacaoStatusBadge } from "@/components/StatusBa
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { calcCarregamento, calcContrato, DEFAULT_PESO_SACA_KG, formatCurrency, formatNumber, formatDate } from "@/lib/utils";
+import { calcCarregamento, calcContrato, DEFAULT_PESO_SACA_KG, formatCurrency, formatNumber, formatDate, getContratoDisplayNumber } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 import { MoneyInput } from "@/components/InputMask";
 
@@ -43,7 +43,7 @@ interface Transacao {
   valorDebitado: number; refProdutor: number; refComissao: number; observacoes?: string;
 }
 interface Contrato {
-  id: string; numeroId: string; status: string; produto: string; cidade?: string;
+  id: string; numeroId: string; displayNumber?: string | null; status: string; produto: string; cidade?: string;
   numSacas: number; valorSaca: number; comissaoPorSaca: number; comissaoTerceiro: number;
   dataFechamento?: string; inicio?: string; termino?: string;
   fechamentoOrigem?: string; fechamentoDestino?: string; refPeso: number;
@@ -311,7 +311,7 @@ export default function ContratoDetailPage() {
   }
 
   async function deleteContrato() {
-    if (!confirm(`Excluir o contrato ${contrato!.numeroId}?`)) return;
+    if (!confirm(`Excluir o contrato ${getContratoDisplayNumber(contrato!)}?`)) return;
     await apiFetch(`/contratos/${id}`, { method: "DELETE" });
     router.push("/contratos");
   }
@@ -467,7 +467,7 @@ export default function ContratoDetailPage() {
           </button>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-bold text-gray-900">{contrato.numeroId}</h1>
+              <h1 className="text-xl font-bold text-gray-900">{getContratoDisplayNumber(contrato)}</h1>
               <ContratoStatusBadge status={contrato.status} />
               {/* Status rápido — admin only */}
               {isAdmin && (

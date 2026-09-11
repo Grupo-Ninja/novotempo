@@ -59,6 +59,7 @@ router.get("/", authMiddleware, async (_req, res, next) => {
           return {
             id: c.id,
             numeroId: c.numeroId,
+            displayNumber: c.displayNumber,
             status: c.status,
             produto: c.produto,
             comprador: c.comprador.nome,

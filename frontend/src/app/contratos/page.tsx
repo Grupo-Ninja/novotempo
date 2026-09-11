@@ -6,12 +6,13 @@ import { ContratoStatusBadge } from "@/components/StatusBadge";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { formatCurrency, formatNumber, formatDate, calcContrato } from "@/lib/utils";
+import { formatCurrency, formatNumber, formatDate, calcContrato, getContratoDisplayNumber } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 
 interface Contrato {
   id: string;
   numeroId: string;
+  displayNumber?: string | null;
   status: string;
   produto: string;
   cidade?: string;
@@ -90,7 +91,7 @@ export default function ContratosPage() {
           <input
             type="text"
             className="input flex-1"
-            placeholder="Buscar por ID, produto, comprador, produtor..."
+            placeholder="Buscar por contrato, produto, comprador, produtor..."
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
@@ -185,7 +186,7 @@ export default function ContratosPage() {
                       <tr key={c.id} className="hover:bg-gray-50">
                         <td className="table-td">
                           <Link href={`/contratos/${c.id}`} className="text-bt-mid font-semibold hover:underline">
-                            {c.numeroId}
+                            {getContratoDisplayNumber(c)}
                           </Link>
                         </td>
                         <td className="table-td font-medium">{c.produto}</td>

@@ -36,6 +36,10 @@ export function generateNumeroId(prefix: string): string {
   return `${prefix}${year}${month}${random}`;
 }
 
+export function getContratoDisplayNumber(contrato: { displayNumber?: string | null; numeroId: string }): string {
+  return contrato.displayNumber || contrato.numeroId;
+}
+
 export const DEFAULT_PESO_SACA_KG = 60;
 
 export function roundMoney(value: number): number {

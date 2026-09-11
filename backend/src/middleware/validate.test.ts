@@ -2,9 +2,15 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 import { carregamentoSchema, transacaoSchema, transacaoUpdateSchema } from "./validate";
-import { calcCarregamento, calcFinancialSummary, parseCivilDate, parseCivilDateRange, shouldSyncAutoTransacao } from "../lib/utils";
+import { calcCarregamento, calcFinancialSummary, formatContractDisplayNumber, parseCivilDate, parseCivilDateRange, shouldSyncAutoTransacao } from "../lib/utils";
 
 const contratoId = "contrato-1";
+
+test("formata número comercial sequencial de contrato", () => {
+  assert.equal(formatContractDisplayNumber(1), "CTR-000001");
+  assert.equal(formatContractDisplayNumber(27n), "CTR-000027");
+  assert.equal(formatContractDisplayNumber(123456), "CTR-123456");
+});
 
 test("pagamento parcial não introduz zeros nem campos ausentes", () => {
   assert.deepEqual(transacaoUpdateSchema.parse({ status: "pago" }), { status: "pago" });

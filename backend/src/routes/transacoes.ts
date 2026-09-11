@@ -53,7 +53,7 @@ router.get("/uploads/:filename", authMiddleware, (req, res) => {
 // GET /api/transacoes?contratoId=&status=&dataInicio=&dataFim=&comprador=&produtor=&page=&limit=
 router.get("/", authMiddleware, async (req, res, next) => {
   try {
-    const { contratoId, status, dataInicio, dataFim, comprador, produtor, page, limit } = req.query;
+    const { contratoId, status, dataInicio, dataFim, comprador, produtor, carregamento, page, limit } = req.query;
     const pageNum = Math.max(1, parseInt(String(page || "1")));
     const limitNum = Math.min(100, Math.max(1, parseInt(String(limit || "20"))));
     const skip = (pageNum - 1) * limitNum;
@@ -68,6 +68,17 @@ router.get("/", authMiddleware, async (req, res, next) => {
     }
     if (comprador) where.contrato = { ...where.contrato, comprador: { nome: { contains: String(comprador), mode: "insensitive" } } };
     if (produtor) where.contrato = { ...where.contrato, produtor: { nome: { contains: String(produtor), mode: "insensitive" } } };
+    if (carregamento) {
+      where.AND = [
+        ...(where.AND ?? []),
+        {
+          OR: [
+            { carregamento: { is: { numeroId: { contains: String(carregamento), mode: "insensitive" } } } },
+            { carregamento: { is: { motorista: { contains: String(carregamento), mode: "insensitive" } } } },
+          ],
+        },
+      ];
+    }
 
     const [data, total, allFiltered] = await Promise.all([
       prisma.transacao.findMany({

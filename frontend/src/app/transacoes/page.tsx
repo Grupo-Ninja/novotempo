@@ -5,17 +5,33 @@ import Pagination from "@/components/Pagination";
 import { TransacaoStatusBadge } from "@/components/StatusBadge";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, getContratoDisplayNumber } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 
 const LIMIT = 20;
+const EMPTY = "—";
 
 interface Transacao {
-  id: string; numeroId: string; categoria?: string; dataTransacao?: string; createdAt?: string; dataPagamento?: string;
-  metodoPagamento?: string; nfs?: string; nfAcesso?: string; status: string;
-  valorDebitado: number; refComissao: number;
-  carregamento?: { id: string; numeroId: string } | null;
-  contrato: { id: string; numeroId: string; comprador: { nome: string }; produtor: { nome: string }; };
+  id: string;
+  numeroId: string;
+  categoria?: string;
+  dataTransacao?: string;
+  createdAt?: string;
+  dataPagamento?: string;
+  metodoPagamento?: string;
+  nfs?: string;
+  nfAcesso?: string;
+  status: string;
+  valorDebitado: number;
+  refComissao: number;
+  carregamento?: { id: string; numeroId: string; motorista?: string | null } | null;
+  contrato: {
+    id: string;
+    numeroId: string;
+    displayNumber?: string | null;
+    comprador: { nome: string };
+    produtor: { nome: string };
+  };
 }
 
 export default function TransacoesPage() {
@@ -26,6 +42,7 @@ export default function TransacoesPage() {
   const [dataFim, setDataFim] = useState("");
   const [comprador, setComprador] = useState("");
   const [produtor, setProdutor] = useState("");
+  const [carregamento, setCarregamento] = useState("");
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, totalPages: 1 });
   const [summary, setSummary] = useState({ valorTotal: 0, valorPago: 0, saldoPendente: 0 });
@@ -38,6 +55,7 @@ export default function TransacoesPage() {
     if (dataFim) params.set("dataFim", dataFim);
     if (comprador) params.set("comprador", comprador);
     if (produtor) params.set("produtor", produtor);
+    if (carregamento) params.set("carregamento", carregamento);
     params.set("page", String(p));
     params.set("limit", String(LIMIT));
     try {
@@ -53,14 +71,19 @@ export default function TransacoesPage() {
     setLoading(false);
   }
 
-  useEffect(() => { setPage(1); }, [status, dataInicio, dataFim, comprador, produtor]);
-  useEffect(() => { load(page); }, [status, dataInicio, dataFim, comprador, produtor, page]);
+  useEffect(() => { setPage(1); }, [status, dataInicio, dataFim, comprador, produtor, carregamento]);
+  useEffect(() => { load(page); }, [status, dataInicio, dataFim, comprador, produtor, carregamento, page]);
 
   function clearFilters() {
-    setStatus(""); setDataInicio(""); setDataFim(""); setComprador(""); setProdutor("");
+    setStatus("");
+    setDataInicio("");
+    setDataFim("");
+    setComprador("");
+    setProdutor("");
+    setCarregamento("");
   }
 
-  const hasFilters = status || dataInicio || dataFim || comprador || produtor;
+  const hasFilters = status || dataInicio || dataFim || comprador || produtor || carregamento;
 
   return (
     <DashboardLayout>
@@ -73,8 +96,7 @@ export default function TransacoesPage() {
       </div>
 
       <div className="card">
-        {/* Filtros */}
-        <div className="mb-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="mb-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <div>
             <label className="label">Status</label>
             <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -100,6 +122,10 @@ export default function TransacoesPage() {
             <label className="label">Produtor</label>
             <input className="input" placeholder="Buscar..." value={produtor} onChange={(e) => setProdutor(e.target.value)} />
           </div>
+          <div>
+            <label className="label">Carregamento/Motorista</label>
+            <input className="input" placeholder="Buscar..." value={carregamento} onChange={(e) => setCarregamento(e.target.value)} />
+          </div>
           {hasFilters && (
             <div className="col-span-full flex justify-end">
               <button onClick={clearFilters} className="text-xs text-gray-500 hover:text-gray-700 underline">Limpar filtros</button>
@@ -111,34 +137,40 @@ export default function TransacoesPage() {
           <div className="flex justify-center py-10"><div className="animate-spin w-6 h-6 border-4 border-bt-mid border-t-transparent rounded-full" /></div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px]">
+            <table className="w-full min-w-[1180px]">
               <thead><tr className="border-b border-gray-100">
-                <th className="table-th">ID</th><th className="table-th">Contrato</th>
-                <th className="table-th">Comprador</th><th className="table-th">Carregamento</th><th className="table-th">Categoria</th>
-                <th className="table-th">Criação</th><th className="table-th">Pagamento</th><th className="table-th">Data</th><th className="table-th">Método</th>
-                <th className="table-th">Valor Debitado</th><th className="table-th">Ref. Comissão</th>
-                <th className="table-th">NF Balança</th><th className="table-th">NF Acesso</th>
+                <th className="table-th">ID</th>
+                <th className="table-th">Nº do carregamento</th>
+                <th className="table-th">Motorista</th>
+                <th className="table-th">Contrato</th>
+                <th className="table-th">Comprador</th>
+                <th className="table-th">Categoria</th>
+                <th className="table-th">Valor</th>
+                <th className="table-th">Data</th>
+                <th className="table-th">Pagamento</th>
+                <th className="table-th">NF Balança</th>
                 <th className="table-th">Status</th>
+                <th className="table-th">Ações</th>
               </tr></thead>
               <tbody className="divide-y divide-gray-50">
                 {items.length === 0 ? (
-                  <tr><td colSpan={14} className="table-td text-center text-gray-400 py-10">Nenhuma transação encontrada</td></tr>
+                  <tr><td colSpan={12} className="table-td text-center text-gray-400 py-10">Nenhuma transação encontrada</td></tr>
                 ) : items.map((t) => (
                   <tr key={t.id} className="hover:bg-gray-50">
                     <td className="table-td text-xs text-gray-500">{t.numeroId}</td>
-                    <td className="table-td"><Link href={`/contratos/${t.contrato?.id}`} className="text-bt-mid font-medium hover:underline">{t.contrato?.numeroId}</Link></td>
-                    <td className="table-td">{t.contrato?.comprador?.nome || "-"}</td>
-                    <td className="table-td text-xs">{t.carregamento?.numeroId || "-"}</td>
-                    <td className="table-td">{t.categoria || "-"}</td>
-                    <td className="table-td">{formatDate(t.createdAt ? new Date(t.createdAt) : null)}</td>
-                    <td className="table-td">{formatDate(t.dataPagamento ? new Date(t.dataPagamento) : null)}</td>
-                    <td className="table-td">{formatDate(t.dataTransacao)}</td>
-                    <td className="table-td">{t.metodoPagamento || "-"}</td>
+                    <td className="table-td text-xs">{t.carregamento?.numeroId || EMPTY}</td>
+                    <td className="table-td">{t.carregamento?.motorista || "Não informado"}</td>
+                    <td className="table-td"><Link href={`/contratos/${t.contrato?.id}`} className="text-bt-mid font-medium hover:underline">{getContratoDisplayNumber(t.contrato)}</Link></td>
+                    <td className="table-td">{t.contrato?.comprador?.nome || EMPTY}</td>
+                    <td className="table-td">{t.categoria || EMPTY}</td>
                     <td className="table-td font-medium">{formatCurrency(t.valorDebitado)}</td>
-                    <td className="table-td">{formatCurrency(t.refComissao)}</td>
-                    <td className="table-td text-xs">{t.nfs || "-"}</td>
-                    <td className="table-td text-xs">{t.nfAcesso || "-"}</td>
+                    <td className="table-td">{formatDate(t.dataTransacao)}</td>
+                    <td className="table-td">{t.status === "pago" ? formatDate(t.dataPagamento) : EMPTY}</td>
+                    <td className="table-td text-xs">{t.nfs || EMPTY}</td>
                     <td className="table-td"><TransacaoStatusBadge status={t.status} /></td>
+                    <td className="table-td">
+                      <Link href={`/contratos/${t.contrato?.id}`} className="text-xs text-bt-mid font-semibold hover:underline">Abrir</Link>
+                    </td>
                   </tr>
                 ))}
               </tbody>

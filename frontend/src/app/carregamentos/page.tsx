@@ -4,7 +4,7 @@ import PageHeader from "@/components/PageHeader";
 import Pagination from "@/components/Pagination";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { formatCurrency, formatNumber, formatDate } from "@/lib/utils";
+import { formatCurrency, formatNumber, formatDate, getContratoDisplayNumber } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 
 const LIMIT = 20;
@@ -12,7 +12,7 @@ const LIMIT = 20;
 interface Carregamento {
   id: string; numeroId: string; dataEnvio?: string; motorista?: string;
   produto?: string; pesoKg: number; qntSacas: number; valorCarga: number;
-  contrato: { id: string; numeroId: string; comprador: { nome: string }; produtor: { nome: string }; };
+  contrato: { id: string; numeroId: string; displayNumber?: string | null; comprador: { nome: string }; produtor: { nome: string }; };
 }
 
 export default function CarregamentosPage() {
@@ -111,7 +111,7 @@ export default function CarregamentosPage() {
                 ) : items.map((c) => (
                   <tr key={c.id} className="hover:bg-gray-50">
                     <td className="table-td text-xs text-gray-500">{c.numeroId}</td>
-                    <td className="table-td"><Link href={`/contratos/${c.contrato.id}`} className="text-bt-mid font-medium hover:underline">{c.contrato.numeroId}</Link></td>
+                    <td className="table-td"><Link href={`/contratos/${c.contrato.id}`} className="text-bt-mid font-medium hover:underline">{getContratoDisplayNumber(c.contrato)}</Link></td>
                     <td className="table-td">{c.contrato.comprador.nome}</td>
                     <td className="table-td">{c.contrato.produtor.nome}</td>
                     <td className="table-td">{formatDate(c.dataEnvio)}</td>

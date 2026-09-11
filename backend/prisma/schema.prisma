@@ -44,6 +44,7 @@ model Cliente {
 model Contrato {
   id                String   @id @default(cuid())
   numeroId          String   @unique
+  displayNumber     String?  @unique
   status            String   @default("nao_iniciado")
   dataFechamento    DateTime?
   inicio            DateTime?

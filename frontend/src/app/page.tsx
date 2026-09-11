@@ -3,7 +3,7 @@ import DashboardLayout from "./dashboard-layout";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { formatCurrency, formatNumber } from "@/lib/utils";
+import { formatCurrency, formatNumber, getContratoDisplayNumber } from "@/lib/utils";
 import { ContratoStatusBadge } from "@/components/StatusBadge";
 
 interface DashboardData {
@@ -22,6 +22,7 @@ interface DashboardData {
   contratosRecentes: {
     id: string;
     numeroId: string;
+    displayNumber?: string | null;
     status: string;
     produto: string;
     comprador: string;
@@ -204,7 +205,7 @@ export default function HomePage() {
                         <td className="table-td pl-6">
                           <Link href={`/contratos/${c.id}`}
                             className="font-semibold text-brand-600 hover:text-brand-700 transition-colors text-xs">
-                            {c.numeroId}
+                            {getContratoDisplayNumber(c)}
                           </Link>
                         </td>
                         <td className="table-td font-semibold text-ink">{c.produto}</td>
